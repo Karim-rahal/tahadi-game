@@ -1,3 +1,4 @@
+// Entry point for the تحدي الدروندي backend (Express + Prisma).
 import { createApp } from "./app";
 import { env } from "./env";
 import { logger } from "./logger";
