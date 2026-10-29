@@ -155,6 +155,7 @@ export function GameClient({ gameId }: { gameId: string }) {
     q?.type === "TRUE_FALSE" ? q.ownerTeam : q?.type === "ENUMERATE" ? q.enumActiveTeam : null;
   const finished = state.status === "FINISHED";
   const noMore = !q && !finished;
+  const allDone = state.answeredCount >= state.totalQuestions;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-32 pt-4">
@@ -229,8 +230,12 @@ export function GameClient({ gameId }: { gameId: string }) {
               </button>
             )}
             <ReportButton onReport={actions.report} busy={busy} />
-            <button className="btn-gold flex-[1.4] !px-3" disabled={busy} onClick={() => actions.next()}>
-              التالي
+            <button
+              className="btn-gold flex-[1.4] !px-3"
+              disabled={busy}
+              onClick={() => (allDone ? actions.finish() : actions.next())}
+            >
+              {allDone ? "إنهاء المباراة" : "التالي"}
             </button>
           </div>
         </div>
