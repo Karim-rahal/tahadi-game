@@ -18,6 +18,6 @@ ENV NODE_ENV=production
 # Railway injects PORT; the app reads it.
 EXPOSE 4000
 
-# Apply migrations, then start. (Import of question banks is a separate,
-# idempotent one-off command: `npm run db:import -w @darundi/api`.)
-CMD ["sh", "-c", "npm run prisma:deploy -w @darundi/api && node apps/api/dist/index.js"]
+# Apply migrations, import the question banks (idempotent; non-fatal so a
+# transient import error never blocks serving), then start.
+CMD ["sh", "-c", "npm run prisma:deploy -w @darundi/api && (npm run db:import -w @darundi/api || echo 'seed skipped') && node apps/api/dist/index.js"]
