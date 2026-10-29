@@ -1,0 +1,26 @@
+{
+  "name": "tahadi-aldarundi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "تحدي الدروندي — Arabic two-team trivia game (judge-controlled, single device)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:api": "npm run dev --workspace @darundi/api",
+    "dev:web": "npm run dev --workspace @darundi/web",
+    "build:shared": "npm run build --workspace @darundi/shared",
+    "build:api": "npm run build --workspace @darundi/api",
+    "build:web": "npm run build --workspace @darundi/web",
+    "build": "npm run build:shared && npm run build:api && npm run build:web",
+    "prisma:generate": "npm run prisma:generate --workspace @darundi/api",
+    "prisma:migrate": "npm run prisma:migrate --workspace @darundi/api",
+    "db:import": "npm run import --workspace @darundi/api",
+    "test": "npm run test --workspace @darundi/api",
+    "typecheck": "npm run typecheck --workspace @darundi/shared && npm run typecheck --workspace @darundi/api && npm run typecheck --workspace @darundi/web"
+  }
+}

@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-cairo: "Cairo", system-ui, sans-serif;
+  --font-tajawal: "Tajawal", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1100px 700px at 85% -5%, rgba(43, 168, 232, 0.12), transparent 55%),
+    radial-gradient(1000px 650px at 0% 110%, rgba(242, 86, 127, 0.1), transparent 55%),
+    radial-gradient(900px 600px at 50% 0%, rgba(245, 196, 81, 0.08), transparent 60%),
+    linear-gradient(180deg, #0a0f1e 0%, #070b16 100%);
+  background-attachment: fixed;
+  color: #f1f5f9;
+  font-family: var(--font-cairo);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Respect iOS safe areas for the sticky action bar. */
+  min-height: 100dvh;
+}
+
+/* Arabic numerals align nicely; tabular for scores. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-white/10 bg-ink-700/70 backdrop-blur-sm shadow-card;
+  }
+  .panel-raised {
+    @apply rounded-2xl border border-white/10 bg-gradient-to-b from-ink-600/80 to-ink-700/80 shadow-glow;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-200;
+  }
+  .btn {
+    @apply inline-flex min-h-[44px] select-none items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-base font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-gold {
+    @apply btn bg-gradient-to-b from-gold-300 to-gold-500 text-ink-900 shadow-glow hover:from-gold-300 hover:to-gold-400;
+  }
+  .btn-ghost {
+    @apply btn border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10;
+  }
+  .btn-good {
+    @apply btn bg-good/90 text-ink-900 hover:bg-good;
+  }
+  .btn-bad {
+    @apply btn bg-bad/90 text-ink-900 hover:bg-bad;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-semibold text-slate-300;
+  }
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-ink-800/80 px-4 py-3 text-lg text-slate-50 outline-none ring-gold-400/40 transition focus:border-gold-400/50 focus:ring-2;
+  }
+}
+
+/* Smooth default focus ring for keyboard users. */
+:focus-visible {
+  outline: 2px solid rgba(245, 196, 81, 0.6);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+}

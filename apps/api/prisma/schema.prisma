@@ -1,0 +1,313 @@
+// تحدي الدروندي — PostgreSQL schema (Prisma)
+// Backend-authoritative game state. See docs/GAME_RULES.md and docs/IMPORT_AUDIT.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+
+enum QuestionType {
+  FASTEST // الأسرع يجاوب
+  WHO_AM_I // من أنا؟
+  TRUE_FALSE // صح أم خطأ
+  ENUMERATE // عدّد الإجابات
+}
+
+enum Difficulty {
+  EASY // سهل
+  MEDIUM // متوسط
+  HARD // صعب
+}
+
+enum GameStatus {
+  SETUP
+  ACTIVE
+  PAUSED
+  FINISHED
+}
+
+enum GameQuestionStatus {
+  PENDING
+  ACTIVE
+  ANSWERED
+  SKIPPED
+}
+
+enum TeamSide {
+  A
+  B
+}
+
+// ─────────────────────── Question bank ───────────────────────
+
+model Category {
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  nameAr    String
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  questions Question[]
+}
+
+model ImportBatch {
+  id         String     @id @default(cuid())
+  sourceFile String
+  fileHash   String
+  startedAt  DateTime   @default(now())
+  finishedAt DateTime?
+  totalRead  Int        @default(0)
+  inserted   Int        @default(0)
+  updated    Int        @default(0)
+  skipped    Int        @default(0)
+  warnings   Json       @default("[]")
+  report     Json       @default("{}")
+  questions  Question[]
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  category      Category     @relation(fields: [categoryId], references: [id])
+  categoryId    String
+  type          QuestionType
+  difficulty    Difficulty
+  questionText  String
+  answerText    String
+  explanation   String?
+  // TRUE_FALSE: the correct boolean (true = صح). Null for other types.
+  isTrue        Boolean?
+  // ENUMERATE: minimum answers expected (from source), may be null.
+  minimumRequired Int?
+  topic         String?
+  sect          String?
+  sourceReference String?
+  sourceUrl     String?
+  // We NEVER trust the source's own "verified" flag as proof of fact-check.
+  sourceVerified Boolean     @default(false)
+  reviewStatus  String?
+  reviewNotes   String?
+  // True when the source review_status indicates the item needs review.
+  flaggedForReview Boolean   @default(true)
+  // ENUMERATE lists that look incomplete (fewer answers than minimumRequired).
+  acceptedAnswersIncomplete Boolean @default(false)
+  // Admin can disable a question from future games without deleting it.
+  disabled      Boolean      @default(false)
+  // Provenance: original file + original id, kept separate from the db id.
+  sourceFile    String
+  originalId    String
+  // Stable hash of the normalized content for duplicate detection.
+  contentHash   String
+  // Full original record, preserved verbatim for fidelity.
+  rawMetadata   Json
+  importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id])
+  importBatchId String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  clues           QuestionClue[]
+  acceptedAnswers AcceptedAnswer[]
+  reports         QuestionReport[]
+  gameQuestions   GameQuestion[]
+
+  // Idempotent re-import: a record is uniquely identified by its origin.
+  @@unique([sourceFile, originalId])
+  @@index([categoryId, type, difficulty])
+  @@index([contentHash])
+}
+
+model QuestionClue {
+  id         String   @id @default(cuid())
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId String
+  order      Int
+  text       String
+
+  @@unique([questionId, order])
+}
+
+model AcceptedAnswer {
+  id         String   @id @default(cuid())
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId String
+  order      Int
+  text       String
+  // Normalized form used for answer matching (see @darundi/shared normalizeArabic).
+  normalized String
+  usages     EnumerationUsedAnswer[]
+
+  @@unique([questionId, order])
+  @@index([questionId, normalized])
+}
+
+model QuestionReport {
+  id         String   @id @default(cuid())
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId String
+  gameId     String?
+  reason     String
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([questionId])
+}
+
+// ─────────────────────── Game session ────────────────────────
+
+model GameSession {
+  id         String     @id @default(cuid())
+  status     GameStatus @default(SETUP)
+  // Judge capability: only the SHA-256 hash of the token is stored.
+  tokenHash  String
+  settings   Json
+  selection  Json
+  startingTeam TeamSide @default(A)
+  currentIndex Int      @default(0)
+  winner     TeamSide?
+  isTie      Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  finishedAt DateTime?
+
+  teams         Team[]
+  questions     GameQuestion[]
+  scoreEvents   ScoreEvent[]
+  history       GameActionHistory[]
+  idempotencyKeys IdempotencyKey[]
+
+  @@index([tokenHash])
+}
+
+model Team {
+  id      String      @id @default(cuid())
+  game    GameSession @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId  String
+  side    TeamSide
+  name    String
+  // Maintained score; equals the sum of this team's ScoreEvent deltas.
+  score   Int         @default(0)
+
+  @@unique([gameId, side])
+}
+
+model GameQuestion {
+  id             String             @id @default(cuid())
+  game           GameSession        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId         String
+  question       Question           @relation(fields: [questionId], references: [id])
+  questionId     String
+  order          Int
+  status         GameQuestionStatus @default(PENDING)
+  // WHO_AM_I: how many clues are currently revealed (starts at 1).
+  cluesRevealed  Int                @default(1)
+  // TRUE_FALSE: which team this question belongs to (strict turn-based).
+  ownerTeam      TeamSide?
+  answeredCorrect Boolean?
+  answeredByTeam TeamSide?
+  pointsAwarded  Int                @default(0)
+  // ENUMERATE per-team strike/pass counters, e.g. {"A":{"strikes":1,"passesUsed":0},"B":{...}}
+  enumState      Json?
+  // ENUMERATE: whose turn it currently is within the round.
+  enumActiveTeam TeamSide?
+  startedAt      DateTime?
+  endedAt        DateTime?
+
+  attempts    AnswerAttempt[]
+  usedAnswers EnumerationUsedAnswer[]
+  strikes     Strike[]
+  passes      Pass[]
+
+  @@unique([gameId, order])
+  @@unique([gameId, questionId])
+  @@index([gameId, status])
+}
+
+model AnswerAttempt {
+  id             String       @id @default(cuid())
+  gameQuestion   GameQuestion @relation(fields: [gameQuestionId], references: [id], onDelete: Cascade)
+  gameQuestionId String
+  team           TeamSide
+  correct        Boolean
+  cluesRevealedAtAttempt Int?
+  acceptedAnswerId String?
+  manualText     String?
+  givenAnswer    String?
+  createdAt      DateTime     @default(now())
+}
+
+model EnumerationUsedAnswer {
+  id             String         @id @default(cuid())
+  gameQuestion   GameQuestion   @relation(fields: [gameQuestionId], references: [id], onDelete: Cascade)
+  gameQuestionId String
+  acceptedAnswer AcceptedAnswer @relation(fields: [acceptedAnswerId], references: [id])
+  acceptedAnswerId String
+  team           TeamSide
+  createdAt      DateTime       @default(now())
+
+  // An accepted answer can be counted at most once per game-question.
+  @@unique([gameQuestionId, acceptedAnswerId])
+}
+
+model Strike {
+  id             String       @id @default(cuid())
+  gameQuestion   GameQuestion @relation(fields: [gameQuestionId], references: [id], onDelete: Cascade)
+  gameQuestionId String
+  team           TeamSide
+  reason         String?
+  createdAt      DateTime     @default(now())
+}
+
+model Pass {
+  id             String       @id @default(cuid())
+  gameQuestion   GameQuestion @relation(fields: [gameQuestionId], references: [id], onDelete: Cascade)
+  gameQuestionId String
+  team           TeamSide
+  createdAt      DateTime     @default(now())
+}
+
+model ScoreEvent {
+  id             String      @id @default(cuid())
+  game           GameSession @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId         String
+  team           TeamSide
+  delta          Int
+  reason         String
+  gameQuestionId String?
+  createdAt      DateTime    @default(now())
+
+  @@index([gameId])
+}
+
+// Append-only action log that powers undo. Each row stores an `inverse`
+// describing how to reverse it. Undo marks the latest row `undone`.
+model GameActionHistory {
+  id         String      @id @default(cuid())
+  game       GameSession @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId     String
+  seq        Int
+  actionType String
+  summary    String
+  payload    Json
+  inverse    Json
+  undone     Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+
+  @@unique([gameId, seq])
+  @@index([gameId, undone])
+}
+
+model IdempotencyKey {
+  id        String      @id @default(cuid())
+  game      GameSession @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gameId    String
+  key       String
+  actionType String
+  createdAt DateTime    @default(now())
+
+  @@unique([gameId, key])
+}

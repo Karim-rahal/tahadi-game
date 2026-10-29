@@ -1,0 +1,23 @@
+# Backend (Express + Prisma) — build from the repo root as context.
+# Railway: create a service, set its Dockerfile path to "Dockerfile.api".
+FROM node:20-slim
+
+WORKDIR /app
+
+# Prisma needs openssl at runtime.
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Install all workspaces (shared is bundled into the API at build time).
+COPY . .
+RUN npm install --no-audit --no-fund
+
+# prisma generate + tsup bundle.
+RUN npm run build -w @darundi/api
+
+ENV NODE_ENV=production
+# Railway injects PORT; the app reads it.
+EXPOSE 4000
+
+# Apply migrations, then start. (Import of question banks is a separate,
+# idempotent one-off command: `npm run db:import -w @darundi/api`.)
+CMD ["sh", "-c", "npm run prisma:deploy -w @darundi/api && node apps/api/dist/index.js"]
