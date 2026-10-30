@@ -1,6 +1,10 @@
 import type { ApiResponse } from "@darundi/shared";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// The backend mounts every route under /api (see apps/api/src/app.ts), so the
+// client appends it here. NEXT_PUBLIC_API_URL is the bare origin (no trailing
+// slash, no /api) and is baked at build time.
+const ORIGIN = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/+$/, "");
+const BASE = `${ORIGIN}/api`;
 
 export class ApiError extends Error {
   constructor(
