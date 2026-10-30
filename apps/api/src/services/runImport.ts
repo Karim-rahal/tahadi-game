@@ -116,7 +116,7 @@ export async function importFile(opts: ImportFileOptions): Promise<ImportReport>
       update: data,
     });
 
-    // Upsert clues by (questionId, order) — never delete referenced rows.
+    // Upsert clues by (questionId, order).
     for (let i = 0; i < v.clues.length; i++) {
       await prisma.questionClue.upsert({
         where: { questionId_order: { questionId: question.id, order: i } },
@@ -124,6 +124,8 @@ export async function importFile(opts: ImportFileOptions): Promise<ImportReport>
         update: { text: v.clues[i]! },
       });
     }
+    // Prune stale clues left over when a re-import shrinks a question's clue list.
+    await prisma.questionClue.deleteMany({ where: { questionId: question.id, order: { gte: v.clues.length } } });
     // Upsert accepted-answer GROUPS by (questionId, order): one row per group,
     // with its canonical text + alias spellings. Aliases are never separate rows.
     for (let i = 0; i < v.answerGroups.length; i++) {
@@ -134,6 +136,11 @@ export async function importFile(opts: ImportFileOptions): Promise<ImportReport>
         update: { text: g.canonical, aliases: g.aliases, normalized: normalizeArabic(g.canonical) },
       });
     }
+    // Prune stale answer rows from a shrunk re-import — but only those never
+    // used in a game (a referenced row would break the foreign key).
+    await prisma.acceptedAnswer.deleteMany({
+      where: { questionId: question.id, order: { gte: v.answerGroups.length }, usages: { none: {} } },
+    });
 
     const status = existing ? "updated" : "inserted";
     if (existing) report.updated++;
