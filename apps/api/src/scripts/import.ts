@@ -63,7 +63,7 @@ async function main() {
   );
   results.push(
     await importFile({
-      filePath: path.join(dataDir, "football", "football_core.json"),
+      filePath: path.join(dataDir, "football", "football_1200.json"),
       sourceFile: "football",
       categorySlug: "football",
       categoryNameAr: "كرة القدم",

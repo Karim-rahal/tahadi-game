@@ -67,30 +67,29 @@ The **alias / answer-group schema** is therefore deferred to the football work,
 where aliases are abundant and essential. Lebanon's raw groups are preserved in
 `rawMetadata` for when that feature lands.
 
-## كرة القدم — Football — PARTIAL (verified winners-core, 385)
+## كرة القدم — Football — IMPORTED (full 1,200)
 
-The supplied 1,200 draft was winner-template-heavy and off-spec, so it was NOT
-imported. Instead a **deterministically-correct "winners core"** is generated
-(`scripts/gen_football.py`) from champion/winner tables that were web-confirmed
-(UCL & EPL recent years, World Cup 1930–2022, Euro through 2024, Copa 2024) and
-cross-checked for internal consistency. **385 questions**, in
-`data/football/football_core.json`:
+Per the request, the **full 1,200** supplied draft is reentered
+(`data/football/football_1200.json`, 300 per mode), with answer-group aliases.
+Before import it was passed through a deterministic verify+fix pass
+(`scripts/verify_football.py`) against web-confirmed champion tables (big-5
+leagues + UCL 2000–2025, World Cup 1930–2022, Euro, Copa):
 
-- fastest-answer 200 (who won competition X in year Y — big-5 leagues, UCL, WC,
-  Euro, Copa), true/false 154 (balanced 77/77), enumeration 19 (distinct winners
-  of a competition over a period — exhaustive within scope, with **club aliases**
-  like "Manchester United"), who-am-i 12 (clubs; clues derived only from the
-  verified title tables).
-- Serie A 2005 & 2006 are omitted (Calciopoli — contested/revoked titles); no
-  unfinished competition is included.
-- This exercises the new answer-group alias feature with real data.
+- **655 winner-based questions deterministically checked → 654 already correct,
+  1 fixed.** The draft's factual winner data is sound (it was repetitive, not
+  wrong). The importer now reads the draft's camelCase fields
+  (`canonicalAnswer` / `acceptedAnswers` / `answerGroups` / `verificationStatus`),
+  and a test confirms **all 1,200 map with zero skips**.
+- Enumeration imports as answer GROUPS with club aliases (e.g. "Manchester
+  United") and the judge's list gets a search box.
 
-**NOT delivered (honest shortfall):** this is the verifiable winners core, not
-the full 1,200 with the required topic distribution (Ligue 1 share, Europa
-League, players/transfers/records) or the breadth of variety (player careers,
-transfers, managers, memorable matches, golden boots, rivalries, stadiums). That
-content is verifiable per-fact but not at 1,200-scale in one pass, and is the
-remaining football work. The accuracy disclaimer applies.
+**Honest limits:** the remaining **545** questions (كأس آسيا / Asian Cup,
+who-am-i clue chains, non-winner items, Serie A 2005/06 under Calciopoli,
+enumeration ranges before 2000) were **not** deterministically verified — they
+are editorial-draft content, covered by the accuracy disclaimer and the internal
+`verificationStatus`. The draft remains winner-template-heavy and does not match
+the spec's topic distribution (no Ligue 1, no Europa League, no
+players/transfers/records bucket); broadening that variety is a further step.
 
 ## Flagged-question feature — REMOVED (player-facing)
 

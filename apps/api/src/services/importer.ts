@@ -96,8 +96,10 @@ export function mapRecord(raw: RawRecord, sourceFile: SourceFile): MapResult {
   const type = questionTypeFromArabic(str(raw.type));
   const difficulty = difficultyFromArabic(str(raw.difficulty));
   const questionText = str(raw.question);
-  const answerText = str(raw.answer);
-  const acceptedAnswersRaw = arr(raw.accepted_answers);
+  // Newer banks use `canonicalAnswer` + camelCase `acceptedAnswers` (football);
+  // older ones use `answer` + `accepted_answers`. Support both.
+  const answerText = str(raw.answer) || str(raw.canonicalAnswer);
+  const acceptedAnswersRaw = arr(raw.accepted_answers).length ? arr(raw.accepted_answers) : arr(raw.acceptedAnswers);
   const clues = arr(raw.clues);
 
   // Build answer GROUPS: from explicit answer_groups (football/lebanon) when
@@ -127,10 +129,10 @@ export function mapRecord(raw: RawRecord, sourceFile: SourceFile): MapResult {
   const meta = (raw.metadata && typeof raw.metadata === "object" ? (raw.metadata as RawRecord) : {}) as RawRecord;
 
   const explanation = strOrNull(raw.explanation) ?? strOrNull(meta.explanation);
-  const reviewNotes = strOrNull(raw.review_notes) ?? strOrNull(raw.note);
+  const reviewNotes = strOrNull(raw.review_notes) ?? strOrNull(raw.note) ?? strOrNull(raw.editorialNote);
   const sourceReference = strOrNull(raw.source_reference) ?? strOrNull(raw.source);
   const sourceUrl = strOrNull(raw.source_url);
-  const reviewStatus = strOrNull(raw.review_status);
+  const reviewStatus = strOrNull(raw.review_status) ?? strOrNull(raw.verificationStatus);
   const topic = strOrNull(raw.topic);
   const sect = strOrNull(raw.sect);
 
