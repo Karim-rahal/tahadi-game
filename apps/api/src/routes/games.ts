@@ -4,12 +4,14 @@ import {
   answerActionSchema,
   createGameSchema,
   enumerateAnswerSchema,
+  poolCountSchema,
   revealClueSchema,
   scoreAdjustSchema,
   teamActionSchema,
 } from "@darundi/shared";
 import { prisma } from "../db";
 import { asyncHandler, badRequest, forbidden, notFound, ok } from "../lib/http";
+import { countEligibleQuestions } from "../services/selection";
 import {
   generateToken,
   hashToken,
@@ -35,6 +37,15 @@ import {
 } from "../services/engine";
 
 export const gamesRouter = Router();
+
+/** Count the eligible question pool for the chosen categories/types (setup max). */
+gamesRouter.post(
+  "/pool-count",
+  asyncHandler(async (req, res) => {
+    const body = poolCountSchema.parse(req.body);
+    ok(res, { count: await countEligibleQuestions(body) });
+  }),
+);
 
 /** Create a game. Returns a resume token; also sets the HttpOnly session cookie. */
 gamesRouter.post(

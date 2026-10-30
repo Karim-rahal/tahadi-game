@@ -1,6 +1,22 @@
-import type { Difficulty, MatchSelection, QuestionType, TeamSide } from "@darundi/shared";
+import type { Difficulty, MatchSelection, PoolCountInput, QuestionType, TeamSide } from "@darundi/shared";
 import { ownerForTurnIndex } from "@darundi/shared";
 import { prisma } from "../db";
+
+/**
+ * Count the eligible question pool for a selection. Difficulty is never
+ * filtered (all difficulties are always included), matching match composition.
+ * Drives setup's "max number of questions".
+ */
+export async function countEligibleQuestions(input: PoolCountInput): Promise<number> {
+  return prisma.question.count({
+    where: {
+      categoryId: { in: input.categoryIds },
+      type: { in: input.types },
+      disabled: false,
+      ...(input.excludeFlaggedForReview ? { flaggedForReview: false } : {}),
+    },
+  });
+}
 
 export interface SelectedQuestion {
   questionId: string;

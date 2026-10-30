@@ -1,20 +1,23 @@
 import type { Difficulty, QuestionType } from "@darundi/shared";
 import { DIFFICULTY_AR, QUESTION_TYPE_AR } from "@darundi/shared";
+import { CheckCircle2, ListChecks, VenetianMask, Zap, type LucideIcon } from "lucide-react";
 
 export const typeLabel = (t: QuestionType) => QUESTION_TYPE_AR[t];
 export const difficultyLabel = (d: Difficulty) => DIFFICULTY_AR[d];
 
-export const difficultyColor: Record<Difficulty, string> = {
-  EASY: "text-emerald-300 border-emerald-400/30 bg-emerald-400/10",
-  MEDIUM: "text-gold-300 border-gold-400/30 bg-gold-400/10",
-  HARD: "text-rose-300 border-rose-400/30 bg-rose-400/10",
+/** SVG icon per question type (no emoji — renders consistently everywhere). */
+export const typeIcons: Record<QuestionType, LucideIcon> = {
+  FASTEST: Zap,
+  WHO_AM_I: VenetianMask,
+  TRUE_FALSE: CheckCircle2,
+  ENUMERATE: ListChecks,
 };
 
-export const typeIcon: Record<QuestionType, string> = {
-  FASTEST: "⚡",
-  WHO_AM_I: "🕵️",
-  TRUE_FALSE: "✅",
-  ENUMERATE: "📝",
+/** Light-theme difficulty chip styling (shown in the question bank only). */
+export const difficultyColor: Record<Difficulty, string> = {
+  EASY: "text-good-600 border-good-500/30 bg-good-50",
+  MEDIUM: "text-teamA-700 border-teamA-500/30 bg-teamA-50",
+  HARD: "text-bad-600 border-bad-500/30 bg-bad-50",
 };
 
 export const statusLabel: Record<string, string> = {

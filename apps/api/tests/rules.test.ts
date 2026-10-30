@@ -1,48 +1,34 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_SETTINGS,
+  ENUM_PASSES_PER_TEAM,
+  ENUM_STRIKES_PER_TEAM,
+  POINTS_PER_QUESTION,
   advanceTurn,
-  canPass,
-  computeScoreDelta,
-  isEliminated,
+  computeAnswerPoints,
   matchWinner,
   ownerForTurnIndex,
-  whoAmIPoints,
+  resolveEnumeration,
+  type EnumTeamState,
 } from "@darundi/shared";
 
-describe("scoring", () => {
-  it("fastest awards difficulty points when correct", () => {
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "FASTEST", difficulty: "EASY", correct: true })).toBe(1);
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "FASTEST", difficulty: "MEDIUM", correct: true })).toBe(2);
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "FASTEST", difficulty: "HARD", correct: true })).toBe(3);
+const s = (strikes: number, passesUsed = 0): EnumTeamState => ({ strikes, passesUsed });
+
+describe("universal scoring — every question is worth exactly one point", () => {
+  it("awards exactly one point on a correct answer regardless of difficulty", () => {
+    // Difficulty is not even a parameter anymore — the value is always 1.
+    expect(computeAnswerPoints(true)).toBe(1);
+    expect(POINTS_PER_QUESTION).toBe(1);
   });
 
-  it("fastest wrong gives zero by default (no penalty)", () => {
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "FASTEST", difficulty: "HARD", correct: false })).toBe(0);
-  });
-
-  it("true/false awards only on correct", () => {
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "TRUE_FALSE", difficulty: "MEDIUM", correct: true })).toBe(2);
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "TRUE_FALSE", difficulty: "MEDIUM", correct: false })).toBe(0);
-  });
-
-  it("enumerate awards pointsPerAnswer per correct", () => {
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "ENUMERATE", difficulty: "EASY", correct: true })).toBe(1);
+  it("awards zero on an incorrect answer (no penalties)", () => {
+    expect(computeAnswerPoints(false)).toBe(0);
   });
 });
 
-describe("who am I — points decrease with clues", () => {
-  it("is highest on the first clue and floors at minPoints", () => {
-    // HARD max is 5, penalty 1/clue, floor 1
-    expect(whoAmIPoints(DEFAULT_SETTINGS, "HARD", 1)).toBe(5);
-    expect(whoAmIPoints(DEFAULT_SETTINGS, "HARD", 2)).toBe(4);
-    expect(whoAmIPoints(DEFAULT_SETTINGS, "HARD", 3)).toBe(3);
-    expect(whoAmIPoints(DEFAULT_SETTINGS, "HARD", 10)).toBe(1); // floored
-  });
-
-  it("computeScoreDelta uses cluesRevealed for WHO_AM_I", () => {
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "WHO_AM_I", difficulty: "EASY", correct: true, cluesRevealed: 1 })).toBe(3);
-    expect(computeScoreDelta(DEFAULT_SETTINGS, { type: "WHO_AM_I", difficulty: "EASY", correct: true, cluesRevealed: 3 })).toBe(1);
+describe("fixed enumeration limits", () => {
+  it("is three strikes and one pass per team", () => {
+    expect(ENUM_STRIKES_PER_TEAM).toBe(3);
+    expect(ENUM_PASSES_PER_TEAM).toBe(1);
   });
 });
 
@@ -61,18 +47,57 @@ describe("turns", () => {
   });
 });
 
-describe("enumerate state", () => {
-  it("eliminates a team at the strike limit", () => {
-    expect(isEliminated(DEFAULT_SETTINGS, { strikes: 2, passesUsed: 0 })).toBe(false);
-    expect(isEliminated(DEFAULT_SETTINGS, { strikes: 3, passesUsed: 0 })).toBe(true);
+describe("enumeration winner — Rule A: three strikes ends immediately", () => {
+  it("Team A reaching 3 strikes → Team B wins", () => {
+    const r = resolveEnumeration(s(3), s(0), false);
+    expect(r).toEqual({ resolved: true, winner: "B", reason: "THREE_STRIKES_A" });
   });
-  it("allows passes up to the configured limit", () => {
-    expect(canPass(DEFAULT_SETTINGS, { strikes: 0, passesUsed: 0 })).toBe(true);
-    expect(canPass(DEFAULT_SETTINGS, { strikes: 0, passesUsed: 1 })).toBe(false);
+
+  it("Team B reaching 3 strikes → Team A wins", () => {
+    const r = resolveEnumeration(s(1), s(3), false);
+    expect(r).toEqual({ resolved: true, winner: "A", reason: "THREE_STRIKES_B" });
+  });
+
+  it("three strikes wins even before the answer list is exhausted", () => {
+    expect(resolveEnumeration(s(3, 1), s(2, 0), false).winner).toBe("B");
   });
 });
 
-describe("winner", () => {
+describe("enumeration winner — Rule B: all answers completed", () => {
+  it("does not resolve while answers remain and nobody has 3 strikes", () => {
+    expect(resolveEnumeration(s(1), s(2), false)).toEqual({ resolved: false, winner: null, reason: null });
+  });
+
+  it("fewer strikes wins (A)", () => {
+    expect(resolveEnumeration(s(1), s(2), true)).toEqual({ resolved: true, winner: "A", reason: "FEWER_STRIKES_A" });
+  });
+
+  it("fewer strikes wins (B)", () => {
+    expect(resolveEnumeration(s(2), s(0), true)).toEqual({ resolved: true, winner: "B", reason: "FEWER_STRIKES_B" });
+  });
+
+  it("equal strikes → the team that did NOT use its pass wins (A unused, B used)", () => {
+    expect(resolveEnumeration(s(1, 0), s(1, 1), true)).toEqual({ resolved: true, winner: "A", reason: "UNUSED_PASS_A" });
+  });
+
+  it("equal strikes → the team that did NOT use its pass wins (B unused, A used)", () => {
+    expect(resolveEnumeration(s(1, 1), s(1, 0), true)).toEqual({ resolved: true, winner: "B", reason: "UNUSED_PASS_B" });
+  });
+
+  it("equal strikes and BOTH used their pass → tie, no point", () => {
+    expect(resolveEnumeration(s(2, 1), s(2, 1), true)).toEqual({ resolved: true, winner: null, reason: "TIE" });
+  });
+
+  it("equal strikes and NEITHER used their pass → tie, no point", () => {
+    expect(resolveEnumeration(s(0, 0), s(0, 0), true)).toEqual({ resolved: true, winner: null, reason: "TIE" });
+  });
+
+  it("completing all answers always resolves the question", () => {
+    expect(resolveEnumeration(s(0), s(0), true).resolved).toBe(true);
+  });
+});
+
+describe("match winner", () => {
   it("picks the higher score and detects ties", () => {
     expect(matchWinner(5, 3)).toBe("A");
     expect(matchWinner(2, 9)).toBe("B");

@@ -1,16 +1,17 @@
 import { Prisma } from "@prisma/client";
 import {
+  type EnumReason,
   type GameSettings,
   type JudgeQuestionDto,
   type MatchSelection,
   type TeamSide,
-  computeScoreDelta,
+  ENUM_PASSES_PER_TEAM,
+  ENUM_STRIKES_PER_TEAM,
+  POINTS_PER_QUESTION,
+  computeAnswerPoints,
   matchWinner,
   otherTeam,
-  whoAmIPoints,
-  fastestPoints,
-  trueFalsePoints,
-  enumerateAnswerPoints,
+  resolveEnumeration,
   withSettingsDefaults,
 } from "@darundi/shared";
 import { prisma } from "../db";
@@ -257,7 +258,6 @@ export async function answerQuestion(
 ): Promise<GameStateDto> {
   const game = await loadGameOrThrow(gameId);
   if (game.status !== "ACTIVE") throw conflict("اللعبة ليست نشطة");
-  const settings = withSettingsDefaults(game.settings);
 
   await prisma.$transaction(async (tx) => {
     if (await alreadyProcessed(tx, gameId, input.idempotencyKey, "answer")) return;
@@ -270,18 +270,15 @@ export async function answerQuestion(
     const type = gq.question.type;
     if (type === "ENUMERATE") throw badRequest("استخدم مسار «عدّد الإجابات» لهذا النوع");
 
-    // Strict turn ownership for true/false.
-    if (type === "TRUE_FALSE" && gq.ownerTeam && gq.ownerTeam !== input.team && !settings.trueFalse.allowSteal) {
+    // Strict turn ownership for true/false — the other team can never answer.
+    if (type === "TRUE_FALSE" && gq.ownerTeam && gq.ownerTeam !== input.team) {
       throw badRequest("هذا السؤال مخصّص للفريق صاحب الدور فقط");
     }
 
     const cluesRevealed = type === "WHO_AM_I" ? gq.cluesRevealed : undefined;
-    const delta = computeScoreDelta(settings, {
-      type: type as JudgeQuestionDto["type"],
-      difficulty: gq.question.difficulty as never,
-      correct: input.correct,
-      cluesRevealed,
-    });
+    // Universal scoring: every question is worth exactly one point. Revealed
+    // clues and difficulty never change the value.
+    const delta = computeAnswerPoints(input.correct);
 
     const attempt = await tx.answerAttempt.create({
       data: {
@@ -353,13 +350,50 @@ export async function revealClue(gameId: string, idempotencyKey?: string): Promi
   return getState(gameId);
 }
 
+function cloneEnumState(s: EnumState): EnumState {
+  return { A: { ...s.A }, B: { ...s.B } };
+}
+
+/** How many accepted-list answers are used. Manual accepts don't count here. */
+function usedAcceptedCount(gq: { usedAnswers: { acceptedAnswerId: string }[] }): number {
+  return new Set(gq.usedAnswers.map((u) => u.acceptedAnswerId)).size;
+}
+
+/**
+ * Apply the single point to the enumeration winner (if any) and mark the
+ * question ANSWERED. Returns the created score events for the undo inverse.
+ * The round point is awarded here and ONLY here — never per answer.
+ */
+async function finalizeEnumeration(
+  tx: Tx,
+  gameId: string,
+  gqId: string,
+  winner: TeamSide | null,
+  finalState: EnumState,
+): Promise<{ id: string; team: TeamSide; delta: number }[]> {
+  const created: { id: string; team: TeamSide; delta: number }[] = [];
+  if (winner) created.push(await applyScore(tx, gameId, winner, POINTS_PER_QUESTION, "enumerate:winner", gqId));
+  await tx.gameQuestion.update({
+    where: { id: gqId },
+    data: {
+      status: "ANSWERED",
+      answeredByTeam: winner ?? null,
+      answeredCorrect: null,
+      pointsAwarded: winner ? POINTS_PER_QUESTION : 0,
+      enumState: finalState as unknown as Prisma.InputJsonValue,
+      enumActiveTeam: null,
+      endedAt: new Date(),
+    },
+  });
+  return created;
+}
+
 export async function enumerateAnswer(
   gameId: string,
   input: { team: TeamSide; acceptedAnswerId?: string; manualText?: string; idempotencyKey?: string },
 ): Promise<GameStateDto> {
   const game = await loadGameOrThrow(gameId);
   if (game.status !== "ACTIVE") throw conflict("اللعبة ليست نشطة");
-  const settings = withSettingsDefaults(game.settings);
 
   await prisma.$transaction(async (tx) => {
     if (await alreadyProcessed(tx, gameId, input.idempotencyKey, "enumerate-answer")) return;
@@ -369,66 +403,63 @@ export async function enumerateAnswer(
     });
     if (!gq) throw notFound("لا يوجد سؤال حالي");
     if (gq.question.type !== "ENUMERATE") throw badRequest("هذا ليس سؤال «عدّد الإجابات»");
+    if (gq.status === "ANSWERED") throw conflict("انتهى هذا السؤال");
     if (gq.enumActiveTeam && gq.enumActiveTeam !== input.team) {
       throw badRequest("ليس دور هذا الفريق");
     }
 
-    let usedAnswerId: string | undefined;
+    const prevState = readEnumState(gq.enumState);
+    const prevActive = gq.enumActiveTeam as TeamSide | null;
+
     let createdUsedId: string | undefined;
+    let usedAnswerId: string | undefined;
     if (input.acceptedAnswerId) {
       const ans = gq.question.acceptedAnswers.find((a) => a.id === input.acceptedAnswerId);
       if (!ans) throw badRequest("إجابة غير موجودة في القائمة");
-      const alreadyUsed = gq.usedAnswers.some((u) => u.acceptedAnswerId === ans.id);
-      if (alreadyUsed) throw conflict("هذه الإجابة مستخدمة من قبل");
+      if (gq.usedAnswers.some((u) => u.acceptedAnswerId === ans.id)) throw conflict("هذه الإجابة مستخدمة من قبل");
       const used = await tx.enumerationUsedAnswer.create({
         data: { gameQuestionId: gq.id, acceptedAnswerId: ans.id, team: input.team },
       });
-      usedAnswerId = ans.id;
       createdUsedId = used.id;
+      usedAnswerId = ans.id;
     } else if (!input.manualText) {
       throw badRequest("يلزم اختيار إجابة أو إدخال نص");
     }
 
-    const delta = enumerateAnswerPoints(settings);
-    const created: Inverse["createdScoreEvents"] = [];
-    if (delta !== 0) created.push(await applyScore(tx, gameId, input.team, delta, "enumerate:answer", gq.id));
-
+    // A valid answer never awards a point and never adds a strike; it just
+    // consumes an answer and hands the turn over.
     await tx.answerAttempt.create({
-      data: {
-        gameQuestionId: gq.id,
-        team: input.team,
-        correct: true,
-        acceptedAnswerId: usedAnswerId,
-        manualText: input.manualText,
-      },
+      data: { gameQuestionId: gq.id, team: input.team, correct: true, acceptedAnswerId: usedAnswerId, manualText: input.manualText },
     });
 
-    const nextTeam = nextEnumTeam(settings, readEnumState(gq.enumState), otherTeam(input.team));
-    await tx.gameQuestion.update({ where: { id: gq.id }, data: { enumActiveTeam: nextTeam } });
+    const totalAccepted = gq.question.acceptedAnswers.length;
+    const usedNow = usedAcceptedCount(gq) + (createdUsedId ? 1 : 0);
+    const complete = totalAccepted > 0 && usedNow >= totalAccepted;
+    const res = resolveEnumeration(prevState.A, prevState.B, complete);
 
-    await recordHistory(
-      tx,
-      gameId,
-      "enumerate-answer",
-      `إجابة صحيحة للفريق ${input.team}`,
-      { team: input.team, delta },
-      {
-        createdScoreEvents: created,
-        deleteUsedAnswerIds: createdUsedId ? [createdUsedId] : [],
-        gameQuestionRestore: { id: gq.id, enumActiveTeam: input.team },
-      },
-    );
+    const inverse: Inverse = {
+      deleteUsedAnswerIds: createdUsedId ? [createdUsedId] : [],
+      gameQuestionRestore: { id: gq.id, enumState: prevState, enumActiveTeam: prevActive },
+    };
+    let summary = `إجابة صحيحة للفريق ${input.team}`;
+    if (res.resolved) {
+      inverse.createdScoreEvents = await finalizeEnumeration(tx, gameId, gq.id, res.winner, prevState);
+      inverse.gameQuestionRestore = {
+        id: gq.id,
+        status: "ACTIVE",
+        answeredByTeam: null,
+        pointsAwarded: 0,
+        enumState: prevState,
+        enumActiveTeam: prevActive,
+      };
+      summary = `اكتملت الإجابات — ${res.winner ? `فوز الفريق ${res.winner}` : "تعادل"}`;
+    } else {
+      await tx.gameQuestion.update({ where: { id: gq.id }, data: { enumActiveTeam: otherTeam(input.team) } });
+    }
+
+    await recordHistory(tx, gameId, "enumerate-answer", summary, { team: input.team, resolved: res.resolved }, inverse);
   });
   return getState(gameId);
-}
-
-/** Next team to act in enumeration, skipping an eliminated team. */
-function nextEnumTeam(settings: GameSettings, state: EnumState, preferred: TeamSide): TeamSide {
-  const limit = settings.enumerate.strikesPerTeam;
-  if (state[preferred].strikes < limit) return preferred;
-  const other = otherTeam(preferred);
-  if (state[other].strikes < limit) return other;
-  return preferred; // both eliminated — judge will end the round
 }
 
 export async function enumerateStrike(
@@ -437,33 +468,57 @@ export async function enumerateStrike(
 ): Promise<GameStateDto> {
   const game = await loadGameOrThrow(gameId);
   if (game.status !== "ACTIVE") throw conflict("اللعبة ليست نشطة");
-  const settings = withSettingsDefaults(game.settings);
   await prisma.$transaction(async (tx) => {
     if (await alreadyProcessed(tx, gameId, input.idempotencyKey, "strike")) return;
-    const gq = await tx.gameQuestion.findFirst({ where: { gameId, order: game.currentIndex }, include: { question: true } });
+    const gq = await tx.gameQuestion.findFirst({
+      where: { gameId, order: game.currentIndex },
+      include: { question: { include: { acceptedAnswers: true } }, usedAnswers: true },
+    });
     if (!gq) throw notFound("لا يوجد سؤال حالي");
     if (gq.question.type !== "ENUMERATE") throw badRequest("الأخطاء متاحة في «عدّد الإجابات» فقط");
-    const state = readEnumState(gq.enumState);
-    if (state[input.team].strikes >= settings.enumerate.strikesPerTeam) throw conflict("الفريق مُقصى أصلاً");
+    if (gq.status === "ANSWERED") throw conflict("انتهى هذا السؤال");
+
+    const prevState = readEnumState(gq.enumState);
+    const prevActive = gq.enumActiveTeam as TeamSide | null;
+    if (prevState[input.team].strikes >= ENUM_STRIKES_PER_TEAM) throw conflict("بلغ الفريق الحد الأقصى للأخطاء");
 
     const strike = await tx.strike.create({ data: { gameQuestionId: gq.id, team: input.team } });
-    state[input.team].strikes += 1;
-    const prevActive = gq.enumActiveTeam as TeamSide | null;
-    const nextTeam = nextEnumTeam(settings, state, otherTeam(input.team));
-    await tx.gameQuestion.update({ where: { id: gq.id }, data: { enumState: state as unknown as Prisma.InputJsonValue, enumActiveTeam: nextTeam } });
+    const newState = cloneEnumState(prevState);
+    newState[input.team].strikes += 1;
 
-    await recordHistory(tx, gameId, "strike", `خطأ للفريق ${input.team}`, { team: input.team }, {
+    const totalAccepted = gq.question.acceptedAnswers.length;
+    const complete = totalAccepted > 0 && usedAcceptedCount(gq) >= totalAccepted;
+    const res = resolveEnumeration(newState.A, newState.B, complete);
+
+    const inverse: Inverse = {
       deleteStrikeIds: [strike.id],
-      gameQuestionRestore: { id: gq.id, enumState: readEnumStateRevert(state, input.team), enumActiveTeam: prevActive },
-    });
+      gameQuestionRestore: { id: gq.id, enumState: prevState, enumActiveTeam: prevActive },
+    };
+    let summary = `خطأ للفريق ${input.team}`;
+    if (res.resolved) {
+      inverse.createdScoreEvents = await finalizeEnumeration(tx, gameId, gq.id, res.winner, newState);
+      inverse.gameQuestionRestore = {
+        id: gq.id,
+        status: "ACTIVE",
+        answeredByTeam: null,
+        pointsAwarded: 0,
+        enumState: prevState,
+        enumActiveTeam: prevActive,
+      };
+      summary =
+        newState[input.team].strikes >= ENUM_STRIKES_PER_TEAM
+          ? `٣ أخطاء للفريق ${input.team} — فوز الفريق ${otherTeam(input.team)}`
+          : `اكتملت الإجابات — ${res.winner ? `فوز الفريق ${res.winner}` : "تعادل"}`;
+    } else {
+      await tx.gameQuestion.update({
+        where: { id: gq.id },
+        data: { enumState: newState as unknown as Prisma.InputJsonValue, enumActiveTeam: otherTeam(input.team) },
+      });
+    }
+
+    await recordHistory(tx, gameId, "strike", summary, { team: input.team, resolved: res.resolved }, inverse);
   });
   return getState(gameId);
-}
-
-function readEnumStateRevert(state: EnumState, team: TeamSide): EnumState {
-  const copy: EnumState = { A: { ...state.A }, B: { ...state.B } };
-  copy[team].strikes = Math.max(0, copy[team].strikes - 1);
-  return copy;
 }
 
 export async function enumeratePass(
@@ -472,32 +527,36 @@ export async function enumeratePass(
 ): Promise<GameStateDto> {
   const game = await loadGameOrThrow(gameId);
   if (game.status !== "ACTIVE") throw conflict("اللعبة ليست نشطة");
-  const settings = withSettingsDefaults(game.settings);
   await prisma.$transaction(async (tx) => {
     if (await alreadyProcessed(tx, gameId, input.idempotencyKey, "pass")) return;
-    const gq = await tx.gameQuestion.findFirst({ where: { gameId, order: game.currentIndex }, include: { question: true } });
+    const gq = await tx.gameQuestion.findFirst({
+      where: { gameId, order: game.currentIndex },
+      include: { question: { include: { acceptedAnswers: true } }, usedAnswers: true },
+    });
     if (!gq) throw notFound("لا يوجد سؤال حالي");
     if (gq.question.type !== "ENUMERATE") throw badRequest("التمرير متاح في «عدّد الإجابات» فقط");
-    const state = readEnumState(gq.enumState);
-    if (state[input.team].passesUsed >= settings.enumerate.passesPerTeam) throw conflict("لا تمريرات متبقية");
+    if (gq.status === "ANSWERED") throw conflict("انتهى هذا السؤال");
+
+    const prevState = readEnumState(gq.enumState);
+    const prevActive = gq.enumActiveTeam as TeamSide | null;
+    if (prevState[input.team].passesUsed >= ENUM_PASSES_PER_TEAM) throw conflict("لا تمريرات متبقية");
 
     const pass = await tx.pass.create({ data: { gameQuestionId: gq.id, team: input.team } });
-    state[input.team].passesUsed += 1;
-    const prevActive = gq.enumActiveTeam as TeamSide | null;
-    const nextTeam = nextEnumTeam(settings, state, otherTeam(input.team));
-    await tx.gameQuestion.update({ where: { id: gq.id }, data: { enumState: state as unknown as Prisma.InputJsonValue, enumActiveTeam: nextTeam } });
+    const newState = cloneEnumState(prevState);
+    newState[input.team].passesUsed += 1;
+
+    // A pass never adds a strike and never ends the round on its own.
+    await tx.gameQuestion.update({
+      where: { id: gq.id },
+      data: { enumState: newState as unknown as Prisma.InputJsonValue, enumActiveTeam: otherTeam(input.team) },
+    });
+
     await recordHistory(tx, gameId, "pass", `تمرير الفريق ${input.team}`, { team: input.team }, {
       deletePassIds: [pass.id],
-      gameQuestionRestore: { id: gq.id, enumState: revertPass(state, input.team), enumActiveTeam: prevActive },
+      gameQuestionRestore: { id: gq.id, enumState: prevState, enumActiveTeam: prevActive },
     });
   });
   return getState(gameId);
-}
-
-function revertPass(state: EnumState, team: TeamSide): EnumState {
-  const copy: EnumState = { A: { ...state.A }, B: { ...state.B } };
-  copy[team].passesUsed = Math.max(0, copy[team].passesUsed - 1);
-  return copy;
 }
 
 export async function skipQuestion(gameId: string, idempotencyKey?: string): Promise<GameStateDto> {
@@ -641,7 +700,7 @@ export async function getState(gameId: string): Promise<GameStateDto> {
 
   const undoable = await prisma.gameActionHistory.count({ where: { gameId, undone: false } });
 
-  const current = await buildCurrentDto(gameId, game.currentIndex, settings);
+  const current = await buildCurrentDto(gameId, game.currentIndex);
 
   return {
     id: game.id,
@@ -668,29 +727,27 @@ export async function getState(gameId: string): Promise<GameStateDto> {
   };
 }
 
-async function buildCurrentDto(
-  gameId: string,
-  currentIndex: number,
-  settings: GameSettings,
-): Promise<JudgeQuestionDto | null> {
+async function buildCurrentDto(gameId: string, currentIndex: number): Promise<JudgeQuestionDto | null> {
   const gq = await currentGameQuestion(gameId, currentIndex);
   if (!gq) return null;
   const q = gq.question;
   const usedByAnswerId = new Map(gq.usedAnswers.map((u) => [u.acceptedAnswerId, u.team as TeamSide]));
+  const enumState = q.type === "ENUMERATE" ? readEnumState(gq.enumState) : null;
 
-  const pointsAvailable =
-    q.type === "WHO_AM_I"
-      ? whoAmIPoints(settings, q.difficulty as never, gq.cluesRevealed)
-      : q.type === "FASTEST"
-        ? fastestPoints(settings, q.difficulty as never)
-        : q.type === "TRUE_FALSE"
-          ? trueFalsePoints(settings, q.difficulty as never)
-          : enumerateAnswerPoints(settings);
+  // Derive the authoritative enumeration result reason from the final state
+  // once the round has ended (no extra DB column needed).
+  let enumResolutionReason: EnumReason | null = null;
+  if (q.type === "ENUMERATE" && gq.status === "ANSWERED" && enumState) {
+    const total = q.acceptedAnswers.length;
+    const complete = total > 0 && usedByAnswerId.size >= total;
+    enumResolutionReason = resolveEnumeration(enumState.A, enumState.B, complete).reason;
+  }
 
   return {
     gameQuestionId: gq.id,
     questionId: q.id,
     order: gq.order,
+    status: gq.status as JudgeQuestionDto["status"],
     type: q.type as JudgeQuestionDto["type"],
     difficulty: q.difficulty as JudgeQuestionDto["difficulty"],
     categoryNameAr: q.category.nameAr,
@@ -702,7 +759,7 @@ async function buildCurrentDto(
     isTrue: q.isTrue,
     ownerTeam: (gq.ownerTeam as TeamSide | null) ?? null,
     enumActiveTeam: (gq.enumActiveTeam as TeamSide | null) ?? null,
-    enumState: q.type === "ENUMERATE" ? readEnumState(gq.enumState) : null,
+    enumState,
     acceptedAnswers: q.acceptedAnswers
       .sort((a, b) => a.order - b.order)
       .map((a) => ({
@@ -717,6 +774,9 @@ async function buildCurrentDto(
     sourceReference: q.sourceReference,
     flaggedForReview: q.flaggedForReview,
     acceptedAnswersIncomplete: q.acceptedAnswersIncomplete,
-    pointsAvailable,
+    answeredByTeam: (gq.answeredByTeam as TeamSide | null) ?? null,
+    pointsAwarded: gq.pointsAwarded,
+    answeredCorrect: gq.answeredCorrect,
+    enumResolutionReason,
   };
 }

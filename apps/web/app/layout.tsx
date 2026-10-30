@@ -1,18 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Cairo, Tajawal } from "next/font/google";
+import { Readex_Pro, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 
-const cairo = Cairo({
+// Display: Readex Pro — a contemporary Arabic/Latin face with real character,
+// used for headings, the big question text, and scores.
+const readex = Readex_Pro({
   subsets: ["arabic", "latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-cairo",
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-readex",
   display: "swap",
 });
 
-const tajawal = Tajawal({
+// Body/UI: IBM Plex Sans Arabic — exceptional on-screen legibility.
+const plex = IBM_Plex_Sans_Arabic({
   subsets: ["arabic", "latin"],
-  weight: ["400", "500", "700", "800"],
-  variable: "--font-tajawal",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-ar",
   display: "swap",
 });
 
@@ -22,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#070B16",
+  themeColor: "#F3F2EF",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -30,7 +33,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" className={`${cairo.variable} ${tajawal.variable}`}>
+    <html lang="ar" dir="rtl" className={`${readex.variable} ${plex.variable}`}>
       <body>{children}</body>
     </html>
   );

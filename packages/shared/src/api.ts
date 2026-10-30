@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DIFFICULTIES, QUESTION_TYPES, TRUE_LABEL_AR, FALSE_LABEL_AR } from "./domain";
 import { gameSettingsSchema, matchSelectionSchema } from "./settings";
+import type { EnumReason } from "./rules";
 
 /** Standard API envelope. */
 export interface ApiOk<T> {
@@ -113,6 +114,8 @@ export interface JudgeQuestionDto {
   gameQuestionId: string;
   questionId: string;
   order: number;
+  /** Lifecycle of THIS question: PENDING | ACTIVE | ANSWERED | SKIPPED. */
+  status: "PENDING" | "ACTIVE" | "ANSWERED" | "SKIPPED";
   type: (typeof QUESTION_TYPES)[number];
   difficulty: (typeof DIFFICULTIES)[number];
   categoryNameAr: string;
@@ -140,5 +143,13 @@ export interface JudgeQuestionDto {
   sourceReference: string | null;
   flaggedForReview: boolean;
   acceptedAnswersIncomplete: boolean;
-  pointsAvailable: number;
+  /** ── Result of this question (populated once status is ANSWERED/SKIPPED) ── */
+  /** Team that received the point, or null (no point / tie / skipped). */
+  answeredByTeam: "A" | "B" | null;
+  /** 0 or 1 — every question is worth exactly one point. */
+  pointsAwarded: number;
+  /** TRUE_FALSE/WHO_AM_I/FASTEST: whether the recorded answer was correct. */
+  answeredCorrect: boolean | null;
+  /** ENUMERATE: the authoritative reason this question was decided. */
+  enumResolutionReason: EnumReason | null;
 }

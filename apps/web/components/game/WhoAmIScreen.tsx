@@ -3,10 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Lightbulb } from "lucide-react";
 import type { ModeProps } from "./types";
-import { AnswerReveal, QuestionMeta, QuestionText, ReviewFlags, TeamJudgeButtons } from "./parts";
+import { AnswerReveal, QuestionMeta, QuestionText, ReviewFlags, TeamPickButtons } from "./parts";
 
 export function WhoAmIScreen({ q, state, actions, busy }: ModeProps) {
-  const answered = state.progress[state.currentIndex]?.status === "ANSWERED";
   const total = q.clues.length;
   const revealed = q.cluesRevealed;
   const visible = q.clues.slice(0, revealed);
@@ -15,14 +14,14 @@ export function WhoAmIScreen({ q, state, actions, busy }: ModeProps) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
       <QuestionMeta q={q} />
-      <div className="panel-raised p-5">
+      <div className="card-raised p-5">
         <QuestionText>{q.questionText}</QuestionText>
-        <div className="mt-2 flex items-center justify-between text-sm text-muted">
-          <span>تلميح {revealed} من {total}</span>
-          <span className="text-gold-300">كلما قلّت التلميحات زادت النقاط</span>
+        <div className="mt-3 flex items-center justify-between text-sm">
+          <span className="font-medium text-ink-soft">تلميح {revealed} من {total}</span>
+          <span className="text-ink-muted">التلميحات لا تُنقص النقاط</span>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-gradient-to-l from-gold-300 to-gold-500 transition-all" style={{ width: `${(revealed / Math.max(total, 1)) * 100}%` }} />
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-line">
+          <div className="h-full rounded-full bg-ink transition-all" style={{ width: `${(revealed / Math.max(total, 1)) * 100}%` }} />
         </div>
       </div>
 
@@ -33,18 +32,18 @@ export function WhoAmIScreen({ q, state, actions, busy }: ModeProps) {
               key={c.order}
               initial={{ opacity: 0, x: 20, height: 0 }}
               animate={{ opacity: 1, x: 0, height: "auto" }}
-              className="panel flex items-start gap-3 p-4"
+              className="card flex items-start gap-3 p-4"
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gold-400/15 font-bold text-gold-300">
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-paper font-bold text-ink">
                 {i + 1}
               </span>
-              <p className="pt-1 text-lg leading-relaxed text-slate-100">{c.text}</p>
+              <p className="pt-1 text-lg leading-relaxed text-ink">{c.text}</p>
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
 
-      <button className="btn-gold w-full" disabled={busy || !moreClues || answered} onClick={() => actions.revealClue()}>
+      <button className="btn-soft w-full" disabled={busy || !moreClues} onClick={() => actions.revealClue()}>
         <Lightbulb size={18} />
         {moreClues ? "كشف التلميح التالي" : "تم كشف كل التلميحات"}
       </button>
@@ -53,13 +52,14 @@ export function WhoAmIScreen({ q, state, actions, busy }: ModeProps) {
       <AnswerReveal answer={q.answerText} explanation={q.explanation} />
 
       <div>
-        <div className="label">من حاول الإجابة؟</div>
-        <TeamJudgeButtons
+        <div className="label">من خمّن الإجابة الصحيحة؟</div>
+        <TeamPickButtons
           teamAName={state.teams.A.name}
           teamBName={state.teams.B.name}
-          disabled={busy || answered}
-          onJudge={(team, correct) => actions.answer(team, correct, { cluesRevealed: revealed })}
+          disabled={busy}
+          onPick={(team) => actions.answer(team, true, { cluesRevealed: revealed })}
         />
+        <p className="mt-2 text-center text-xs text-ink-muted">لا تُسجّل التخمينات الخاطئة — عند الإجابة الصحيحة يأخذ الفريق النقطة.</p>
       </div>
     </motion.div>
   );

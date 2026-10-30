@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 :root {
-  --font-cairo: "Cairo", system-ui, sans-serif;
-  --font-tajawal: "Tajawal", system-ui, sans-serif;
-  color-scheme: dark;
+  --font-readex: "Readex Pro", system-ui, sans-serif;
+  --font-plex-ar: "IBM Plex Sans Arabic", system-ui, sans-serif;
+  color-scheme: light;
 }
 
 html,
@@ -14,61 +14,73 @@ body {
 }
 
 body {
+  /* Bright warm-neutral stage with two faint team-coloured spotlights. */
   background:
-    radial-gradient(1100px 700px at 85% -5%, rgba(43, 168, 232, 0.12), transparent 55%),
-    radial-gradient(1000px 650px at 0% 110%, rgba(242, 86, 127, 0.1), transparent 55%),
-    radial-gradient(900px 600px at 50% 0%, rgba(245, 196, 81, 0.08), transparent 60%),
-    linear-gradient(180deg, #0a0f1e 0%, #070b16 100%);
+    radial-gradient(1200px 680px at 100% -8%, rgba(14, 156, 184, 0.08), transparent 55%),
+    radial-gradient(1100px 640px at 0% 108%, rgba(195, 46, 145, 0.07), transparent 55%),
+    #f3f2ef;
   background-attachment: fixed;
-  color: #f1f5f9;
-  font-family: var(--font-cairo);
+  color: #191522;
+  font-family: var(--font-plex-ar);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  /* Respect iOS safe areas for the sticky action bar. */
   min-height: 100dvh;
 }
 
-/* Arabic numerals align nicely; tabular for scores. */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
 @layer components {
-  .panel {
-    @apply rounded-2xl border border-white/10 bg-ink-700/70 backdrop-blur-sm shadow-card;
+  /* ── Surfaces ───────────────────────────────────────────────── */
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-soft;
   }
-  .panel-raised {
-    @apply rounded-2xl border border-white/10 bg-gradient-to-b from-ink-600/80 to-ink-700/80 shadow-glow;
+  .card-raised {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-200;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface2 px-3 py-1 text-sm font-medium text-ink-soft;
   }
+
+  /* ── Buttons ────────────────────────────────────────────────── */
   .btn {
-    @apply inline-flex min-h-[44px] select-none items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-base font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex min-h-[48px] cursor-pointer select-none items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-semibold leading-none transition-all duration-200 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100;
   }
-  .btn-gold {
-    @apply btn bg-gradient-to-b from-gold-300 to-gold-500 text-ink-900 shadow-glow hover:from-gold-300 hover:to-gold-400;
+  .btn-primary {
+    @apply btn bg-ink text-white shadow-pop hover:bg-ink/90;
   }
-  .btn-ghost {
-    @apply btn border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10;
+  .btn-soft {
+    @apply btn border border-line bg-surface text-ink hover:bg-surface2;
   }
   .btn-good {
-    @apply btn bg-good/90 text-ink-900 hover:bg-good;
+    @apply btn bg-good-500 text-white hover:bg-good-600;
   }
   .btn-bad {
-    @apply btn bg-bad/90 text-ink-900 hover:bg-bad;
+    @apply btn bg-bad-500 text-white hover:bg-bad-600;
   }
+  .btn-teamA {
+    @apply btn bg-teamA-500 text-white shadow-teamA hover:bg-teamA-600;
+  }
+  .btn-teamB {
+    @apply btn bg-teamB-500 text-white shadow-teamB hover:bg-teamB-600;
+  }
+
+  /* ── Forms ──────────────────────────────────────────────────── */
   .label {
-    @apply mb-1.5 block text-sm font-semibold text-slate-300;
+    @apply mb-1.5 block text-sm font-semibold text-ink-soft;
   }
   .input {
-    @apply w-full rounded-xl border border-white/10 bg-ink-800/80 px-4 py-3 text-lg text-slate-50 outline-none ring-gold-400/40 transition focus:border-gold-400/50 focus:ring-2;
+    @apply w-full rounded-xl border border-line bg-surface px-4 py-3 text-lg text-ink outline-none transition focus:border-ink/40 focus:ring-4 focus:ring-ink/5;
+  }
+  select.input {
+    @apply cursor-pointer;
   }
 }
 
-/* Smooth default focus ring for keyboard users. */
+/* Keyboard focus ring. */
 :focus-visible {
-  outline: 2px solid rgba(245, 196, 81, 0.6);
+  outline: 2px solid rgba(25, 21, 34, 0.55);
   outline-offset: 2px;
 }
 
@@ -77,6 +89,16 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
+  background: rgba(25, 21, 34, 0.18);
   border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
