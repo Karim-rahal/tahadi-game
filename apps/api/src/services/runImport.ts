@@ -124,13 +124,14 @@ export async function importFile(opts: ImportFileOptions): Promise<ImportReport>
         update: { text: v.clues[i]! },
       });
     }
-    // Upsert accepted answers by (questionId, order).
-    for (let i = 0; i < v.acceptedAnswers.length; i++) {
-      const text = v.acceptedAnswers[i]!;
+    // Upsert accepted-answer GROUPS by (questionId, order): one row per group,
+    // with its canonical text + alias spellings. Aliases are never separate rows.
+    for (let i = 0; i < v.answerGroups.length; i++) {
+      const g = v.answerGroups[i]!;
       await prisma.acceptedAnswer.upsert({
         where: { questionId_order: { questionId: question.id, order: i } },
-        create: { questionId: question.id, order: i, text, normalized: normalizeArabic(text) },
-        update: { text, normalized: normalizeArabic(text) },
+        create: { questionId: question.id, order: i, text: g.canonical, aliases: g.aliases, normalized: normalizeArabic(g.canonical) },
+        update: { text: g.canonical, aliases: g.aliases, normalized: normalizeArabic(g.canonical) },
       });
     }
 

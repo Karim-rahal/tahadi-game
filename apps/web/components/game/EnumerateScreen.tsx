@@ -30,6 +30,15 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
   const remaining = q.acceptedAnswers.filter((a) => !a.used).length;
   const [hide, setHide] = useState(false);
   const [manual, setManual] = useState("");
+  const [search, setSearch] = useState("");
+
+  const needle = search.trim().toLowerCase();
+  const answers = needle
+    ? q.acceptedAnswers.filter(
+        (a) => a.text.toLowerCase().includes(needle) || a.aliases.some((al) => al.toLowerCase().includes(needle)),
+      )
+    : q.acceptedAnswers;
+  const showSearch = q.acceptedAnswers.length > 10;
 
   const teamText = (side: TeamSide) => (side === "A" ? "text-teamA-700" : "text-teamB-700");
 
@@ -100,25 +109,41 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
         {hide ? (
           <p className="py-6 text-center text-sm text-ink-muted">{t("en.hidden")}</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" dir="rtl">
-            {q.acceptedAnswers.map((a) => (
-              <button
-                key={a.id}
-                disabled={busy || a.used}
-                onClick={() => actions.enumerateAnswer(active, { acceptedAnswerId: a.id })}
-                className={clsx(
-                  "rounded-lg border px-3 py-2 text-sm font-medium transition active:scale-95",
-                  a.used
-                    ? a.usedByTeam === "A"
-                      ? "border-teamA-500/40 bg-teamA-50 text-teamA-700 line-through"
-                      : "border-teamB-500/40 bg-teamB-50 text-teamB-700 line-through"
-                    : "border-line bg-surface text-ink hover:border-ink/30",
-                )}
-              >
-                {a.text}
-              </button>
-            ))}
-          </div>
+          <>
+            {showSearch && (
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("en.search")}
+                className="input mb-2 !py-2 !text-base"
+              />
+            )}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" dir="rtl">
+              {answers.map((a) => (
+                <button
+                  key={a.id}
+                  disabled={busy || a.used}
+                  onClick={() => actions.enumerateAnswer(active, { acceptedAnswerId: a.id })}
+                  className={clsx(
+                    "flex flex-col rounded-lg border px-3 py-2 text-sm font-medium transition active:scale-95",
+                    a.used
+                      ? a.usedByTeam === "A"
+                        ? "border-teamA-500/40 bg-teamA-50 text-teamA-700 line-through"
+                        : "border-teamB-500/40 bg-teamB-50 text-teamB-700 line-through"
+                      : "border-line bg-surface text-ink hover:border-ink/30",
+                  )}
+                >
+                  <span>{a.text}</span>
+                  {a.aliases.length > 0 && (
+                    <span className="truncate text-[11px] font-normal text-ink-muted">{a.aliases.join(" · ")}</span>
+                  )}
+                </button>
+              ))}
+              {answers.length === 0 && (
+                <p className="col-span-full py-4 text-center text-sm text-ink-muted">{t("en.noMatch")}</p>
+              )}
+            </div>
+          </>
         )}
         {/* Manual accept (answer judged valid but not in the list) */}
         <div className="mt-3 flex gap-2">

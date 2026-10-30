@@ -143,6 +143,8 @@ const DICT: Dict = {
   "en.passAvail": { en: "available", ar: "متاح" },
   "en.turnNow": { en: "Answering now:", ar: "دور الإجابة الآن:" },
   "en.checklist": { en: "Accepted answers (referee)", ar: "قائمة الإجابات المقبولة (للحكَم)" },
+  "en.search": { en: "Search answers / aliases…", ar: "ابحث في الإجابات أو المرادفات…" },
+  "en.noMatch": { en: "No matching answer.", ar: "لا إجابة مطابقة." },
   "en.show": { en: "Show", ar: "إظهار" },
   "en.hide": { en: "Hide", ar: "إخفاء" },
   "en.hidden": { en: "List hidden.", ar: "القائمة مخفية." },

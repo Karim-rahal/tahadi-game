@@ -134,8 +134,8 @@ export interface JudgeQuestionDto {
   enumActiveTeam: "A" | "B" | null;
   /** ENUMERATE: per-team strike/pass counters. */
   enumState: { A: { strikes: number; passesUsed: number }; B: { strikes: number; passesUsed: number } } | null;
-  /** ENUMERATE: the private answer checklist. */
-  acceptedAnswers: { id: string; text: string; used: boolean; usedByTeam: "A" | "B" | null }[];
+  /** ENUMERATE: the private answer checklist (one entry per answer group). */
+  acceptedAnswers: { id: string; text: string; aliases: string[]; used: boolean; usedByTeam: "A" | "B" | null }[];
   minimumRequired: number | null;
   /** Review metadata so the judge can decide to skip questionable items. */
   reviewStatus: string | null;

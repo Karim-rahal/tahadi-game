@@ -18,12 +18,21 @@ import {
 
 export type SourceFile = "religious" | "geography" | "mathematics" | "football" | "lebanon";
 
+/** One enumeration answer GROUP: a canonical answer plus alias spellings/names. */
+export interface AnswerGroup {
+  canonical: string;
+  aliases: string[];
+}
+
 export interface MappedQuestion {
   type: QuestionType;
   difficulty: Difficulty;
   questionText: string;
   answerText: string;
+  /** Canonical text of each answer group (one per distinct answer). */
   acceptedAnswers: string[];
+  /** Full answer groups with aliases (canonical === acceptedAnswers[i]). */
+  answerGroups: AnswerGroup[];
   clues: string[];
   explanation: string | null;
   isTrue: boolean | null;
@@ -91,6 +100,24 @@ export function mapRecord(raw: RawRecord, sourceFile: SourceFile): MapResult {
   const acceptedAnswersRaw = arr(raw.accepted_answers);
   const clues = arr(raw.clues);
 
+  // Build answer GROUPS: from explicit answer_groups (football/lebanon) when
+  // present, otherwise one group per flat accepted answer. Aliases are the
+  // group's extra spellings (deduped, canonical removed) — NEVER separate answers.
+  const groupsRaw = (raw.answer_groups ?? raw.answerGroups) as unknown;
+  const answerGroups: AnswerGroup[] = [];
+  if (Array.isArray(groupsRaw) && groupsRaw.length) {
+    for (const g of groupsRaw as RawRecord[]) {
+      const canonical = str(g.canonical) || str(g.canonicalAnswer);
+      if (!canonical) continue;
+      const cn = normalizeArabic(canonical);
+      const aliases = dedupeNormalized(arr(g.acceptedVariants)).filter((v) => normalizeArabic(v) !== cn);
+      answerGroups.push({ canonical, aliases });
+    }
+  }
+  if (answerGroups.length === 0) {
+    for (const a of dedupeNormalized(acceptedAnswersRaw)) answerGroups.push({ canonical: a, aliases: [] });
+  }
+
   if (!type) errors.push(`نوع غير معروف: "${str(raw.type)}"`);
   if (!difficulty) errors.push(`صعوبة غير معروفة: "${str(raw.difficulty)}"`);
   if (!questionText) errors.push("نص السؤال فارغ");
@@ -111,9 +138,9 @@ export function mapRecord(raw: RawRecord, sourceFile: SourceFile): MapResult {
   const minRaw = raw.minimum_required;
   const minimumRequired = typeof minRaw === "number" && Number.isFinite(minRaw) ? minRaw : null;
 
-  // Accepted answers: dedupe by normalized form, preserving original text/order.
-  const acceptedAnswers = dedupeNormalized(acceptedAnswersRaw);
-  if (acceptedAnswers.length !== acceptedAnswersRaw.length) {
+  // Canonical answers = one per group.
+  const acceptedAnswers = answerGroups.map((g) => g.canonical);
+  if (acceptedAnswersRaw.length && dedupeNormalized(acceptedAnswersRaw).length !== acceptedAnswersRaw.length) {
     warnings.push("أُزيلت بدائل مكررة من قائمة الإجابات المقبولة");
   }
 
@@ -158,6 +185,7 @@ export function mapRecord(raw: RawRecord, sourceFile: SourceFile): MapResult {
     questionText,
     answerText: answerText || acceptedAnswers.join("؛ "),
     acceptedAnswers,
+    answerGroups,
     clues,
     explanation,
     isTrue,

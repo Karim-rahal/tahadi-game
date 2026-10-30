@@ -136,7 +136,11 @@ model AcceptedAnswer {
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   questionId String
   order      Int
+  // Canonical text of this answer GROUP (what the judge sees / marks used).
   text       String
+  // Alternate spellings / names for the SAME answer group (not separate answers):
+  // e.g. ["مان يونايتد", "Manchester United"]. Shown to the judge and searchable.
+  aliases    String[] @default([])
   // Normalized form used for answer matching (see @darundi/shared normalizeArabic).
   normalized String
   usages     EnumerationUsedAnswer[]

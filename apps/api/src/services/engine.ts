@@ -882,6 +882,7 @@ async function buildCurrentDto(gameId: string, currentIndex: number): Promise<Ju
       .map((a) => ({
         id: a.id,
         text: a.text,
+        aliases: a.aliases,
         used: usedByAnswerId.has(a.id),
         usedByTeam: usedByAnswerId.get(a.id) ?? null,
       })),
