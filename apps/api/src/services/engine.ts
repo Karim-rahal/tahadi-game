@@ -702,7 +702,6 @@ async function pickRandomQuestion(
       categoryId: { in: selection.categoryIds },
       type: { in: types },
       disabled: false,
-      ...(selection.excludeFlaggedForReview ? { flaggedForReview: false } : {}),
       id: { notIn: excludeIds },
     },
     select: { id: true, type: true },

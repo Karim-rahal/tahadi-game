@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import type { JudgeQuestionDto, TeamSide } from "@/lib/types";
 import { typeIcons } from "@/lib/labels";
@@ -17,24 +17,6 @@ export function QuestionMeta({ q }: { q: JudgeQuestionDto }) {
       </span>
       <span className="chip" dir="rtl">{q.categoryNameAr}</span>
       <span className="chip">{t("q.onePoint")}</span>
-    </div>
-  );
-}
-
-export function ReviewFlags({ q }: { q: JudgeQuestionDto }) {
-  const { t } = useLang();
-  if (!q.flaggedForReview && !q.acceptedAnswersIncomplete) return null;
-  return (
-    <div className="flex items-start gap-2 rounded-xl border border-line bg-surface2 p-3 text-sm text-ink-soft">
-      <AlertTriangle size={18} className="mt-0.5 shrink-0 text-bad-500" />
-      <div>
-        <div className="font-semibold text-ink">{t("q.reviewTitle")}</div>
-        <ul className="mt-1 list-disc space-y-0.5 pe-5">
-          {q.flaggedForReview && <li>{t("q.reviewDraft")}</li>}
-          {q.acceptedAnswersIncomplete && <li>{t("q.reviewIncomplete")}</li>}
-          {q.reviewNotes && <li dir="rtl">{q.reviewNotes}</li>}
-        </ul>
-      </div>
     </div>
   );
 }
@@ -61,8 +43,17 @@ export function AnswerReveal({ answer, explanation }: { answer: string; explanat
 }
 
 export function QuestionText({ children }: { children: React.ReactNode }) {
+  // A pure math expression (digits + operators, no Arabic letters) must render
+  // left-to-right and stay un-reordered inside the RTL layout.
+  const isExpr = typeof children === "string" && /^[\d\s+\-−–×÷*/().=؟?%^٠-٩]+$/.test(children);
   return (
-    <p dir="rtl" className="text-right font-display text-[26px] font-bold leading-[1.45] text-ink sm:text-3xl">
+    <p
+      dir={isExpr ? "ltr" : "rtl"}
+      className={clsx(
+        "font-display text-[26px] font-bold leading-[1.45] text-ink sm:text-3xl",
+        isExpr ? "text-center" : "text-right",
+      )}
+    >
       {children}
     </p>
   );

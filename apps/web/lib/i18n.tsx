@@ -37,6 +37,10 @@ const DICT: Dict = {
   "status.PAUSED": { en: "Paused", ar: "متوقفة مؤقتاً" },
   "status.FINISHED": { en: "Finished", ar: "منتهية" },
   "sb.turn": { en: "Its turn", ar: "دوره الآن" },
+  "disclaimer.text": {
+    en: "Some questions or answers may contain inaccuracies. Your feedback helps us improve the game.",
+    ar: "قد تحتوي بعض الأسئلة أو الإجابات على معلومات غير دقيقة. نرحّب بملاحظاتكم لتحسين اللعبة.",
+  },
 
   // Home
   "home.intro": {

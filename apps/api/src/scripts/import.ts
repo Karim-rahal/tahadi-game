@@ -41,6 +41,16 @@ async function main() {
       dryRun,
     }),
   );
+  results.push(
+    await importFile({
+      filePath: path.join(dataDir, "mathematics", "fast_mathematics_600.json"),
+      sourceFile: "mathematics",
+      categorySlug: "mathematics",
+      categoryNameAr: "الحساب السريع",
+      reportDir: docsDir,
+      dryRun,
+    }),
+  );
 
   for (const r of results) {
     logger.info(

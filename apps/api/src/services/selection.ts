@@ -13,7 +13,6 @@ export async function countEligibleQuestions(input: PoolCountInput): Promise<num
       categoryId: { in: input.categoryIds },
       type: { in: input.types },
       disabled: false,
-      ...(input.excludeFlaggedForReview ? { flaggedForReview: false } : {}),
     },
   });
 }
@@ -52,7 +51,6 @@ export async function buildMatchPlan(
       type: { in: selection.types },
       difficulty: { in: selection.difficulties },
       ...(selection.excludeDisabled ? { disabled: false } : {}),
-      ...(selection.excludeFlaggedForReview ? { flaggedForReview: false } : {}),
     },
     select: { id: true, type: true, difficulty: true },
   });

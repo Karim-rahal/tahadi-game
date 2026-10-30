@@ -12,6 +12,7 @@ import { typeIcons } from "@/lib/labels";
 import { useLang } from "@/lib/i18n";
 import { Logo } from "@/components/Logo";
 import { LangToggle } from "@/components/LangToggle";
+import { Disclaimer } from "@/components/Disclaimer";
 import type { CreateGameResult, GameState } from "@/lib/types";
 
 const DEFAULT_COUNT = 20;
@@ -56,7 +57,6 @@ export default function SetupPage() {
   const [types, setTypes] = useState<QuestionType[]>([...QUESTION_TYPES]);
   const [startingTeam, setStartingTeam] = useState<TeamSide>("A");
   const [count, setCount] = useState<string>(String(DEFAULT_COUNT));
-  const [excludeFlagged, setExcludeFlagged] = useState(false);
   const [pool, setPool] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,13 +79,13 @@ export default function SetupPage() {
     try {
       const res = await api<{ count: number }>("/games/pool-count", {
         method: "POST",
-        body: { categoryIds: catIds, types, excludeFlaggedForReview: excludeFlagged },
+        body: { categoryIds: catIds, types },
       });
       setPool(res.count);
     } catch {
       setPool(null);
     }
-  }, [catIds, types, excludeFlagged]);
+  }, [catIds, types]);
 
   useEffect(() => {
     const id = setTimeout(refreshPool, 200);
@@ -126,7 +126,6 @@ export default function SetupPage() {
             categoryIds: useCatIds,
             types: useTypes,
             totalQuestions: Math.max(1, total),
-            excludeFlaggedForReview: quick ? false : excludeFlagged,
             excludeDisabled: true,
           },
           settings: { startingTeam },
@@ -265,12 +264,10 @@ export default function SetupPage() {
               {t("setup.available")}: <b className="tnum text-ink">{pool ?? "…"}</b>
             </span>
           </div>
-          <label className="mt-3 flex items-center gap-2 text-sm text-ink-soft">
-            <input type="checkbox" checked={excludeFlagged} onChange={(e) => setExcludeFlagged(e.target.checked)} className="size-4 accent-ink" />
-            {t("setup.excludeFlagged")}
-          </label>
         </div>
       </div>
+
+      <Disclaimer className="mt-6" />
 
       <div className="h-24" />
       <div className="fixed inset-x-0 bottom-0 border-t border-line bg-surface/90 backdrop-blur" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>

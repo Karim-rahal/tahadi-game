@@ -41,8 +41,6 @@ export const matchSelectionSchema = z.object({
   difficulties: z.array(z.enum(DIFFICULTIES)).min(1).default([...DIFFICULTIES]),
   /** Total number of questions in the match (judge types this). */
   totalQuestions: z.number().int().min(1).max(200).default(20),
-  /** Exclude questions whose review_status marks them as needing review? */
-  excludeFlaggedForReview: z.boolean().default(false),
   /** Exclude questions an admin has disabled. Always true in practice. */
   excludeDisabled: z.boolean().default(true),
 });
@@ -52,6 +50,5 @@ export type MatchSelection = z.infer<typeof matchSelectionSchema>;
 export const poolCountSchema = z.object({
   categoryIds: z.array(z.string()).min(1),
   types: z.array(z.enum(QUESTION_TYPES)).min(1).default([...QUESTION_TYPES]),
-  excludeFlaggedForReview: z.boolean().default(false),
 });
 export type PoolCountInput = z.infer<typeof poolCountSchema>;

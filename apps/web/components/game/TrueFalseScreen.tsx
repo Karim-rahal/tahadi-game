@@ -6,7 +6,7 @@ import { Check, X } from "lucide-react";
 import type { ModeProps } from "./types";
 import type { TeamSide } from "@/lib/types";
 import { useLang } from "@/lib/i18n";
-import { QuestionMeta, QuestionText, ReviewFlags } from "./parts";
+import { QuestionMeta, QuestionText } from "./parts";
 
 export function TrueFalseScreen({ q, state, actions, busy }: ModeProps) {
   const { t } = useLang();
@@ -40,7 +40,6 @@ export function TrueFalseScreen({ q, state, actions, busy }: ModeProps) {
       <div className="card-raised p-5">
         <QuestionText>{q.questionText}</QuestionText>
       </div>
-      <ReviewFlags q={q} />
 
       <div className="label">{t("tf.record")}</div>
       <div className="grid grid-cols-2 gap-3">

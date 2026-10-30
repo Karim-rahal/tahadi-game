@@ -5,6 +5,7 @@ import { Play, RotateCcw, BookOpen, Landmark, Globe2, Swords } from "lucide-reac
 import { QUESTION_TYPES } from "@darundi/shared";
 import { Logo } from "@/components/Logo";
 import { LangToggle } from "@/components/LangToggle";
+import { Disclaimer } from "@/components/Disclaimer";
 import { typeIcons } from "@/lib/labels";
 import { useLang } from "@/lib/i18n";
 
@@ -94,8 +95,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="mt-8 text-center text-xs text-ink-muted">
-        {QUESTION_TYPES.map((type) => t(`type.${type}`)).join("  ·  ")}
+      <footer className="mt-8 space-y-3 text-center text-xs text-ink-muted">
+        <div>{QUESTION_TYPES.map((type) => t(`type.${type}`)).join("  ·  ")}</div>
+        <Disclaimer />
       </footer>
     </main>
   );

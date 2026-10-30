@@ -8,7 +8,7 @@ import { ENUM_PASSES_PER_TEAM, ENUM_STRIKES_PER_TEAM } from "@darundi/shared";
 import type { ModeProps } from "./types";
 import type { TeamSide } from "@/lib/types";
 import { useLang } from "@/lib/i18n";
-import { QuestionMeta, QuestionText, ReviewFlags } from "./parts";
+import { QuestionMeta, QuestionText } from "./parts";
 
 function StrikeDots({ used, max }: { used: number; max: number }) {
   return (
@@ -88,7 +88,6 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
         <span className={clsx("font-display text-lg font-bold", teamText(active))}>{activeName}</span>
       </div>
 
-      <ReviewFlags q={q} />
 
       {/* Judge-private checklist */}
       <div className="card p-3">

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import type { ModeProps } from "./types";
 import { useLang } from "@/lib/i18n";
-import { AnswerReveal, QuestionMeta, QuestionText, ReviewFlags, TeamPickButtons } from "./parts";
+import { AnswerReveal, QuestionMeta, QuestionText, TeamPickButtons } from "./parts";
 
 export function FastestScreen({ q, state, actions, busy }: ModeProps) {
   const { t } = useLang();
@@ -14,7 +14,6 @@ export function FastestScreen({ q, state, actions, busy }: ModeProps) {
         <div className="mb-2 text-sm font-medium text-ink-soft">{t("fast.readAloud")}</div>
         <QuestionText>{q.questionText}</QuestionText>
       </div>
-      <ReviewFlags q={q} />
       <AnswerReveal answer={q.answerText} explanation={q.explanation} />
       <div>
         <div className="label">{t("fast.whoFirst")}</div>

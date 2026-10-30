@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Lightbulb } from "lucide-react";
 import type { ModeProps } from "./types";
 import { useLang } from "@/lib/i18n";
-import { AnswerReveal, QuestionMeta, QuestionText, ReviewFlags, TeamPickButtons } from "./parts";
+import { AnswerReveal, QuestionMeta, QuestionText, TeamPickButtons } from "./parts";
 
 export function WhoAmIScreen({ q, state, actions, busy }: ModeProps) {
   const { t } = useLang();
@@ -48,7 +48,6 @@ export function WhoAmIScreen({ q, state, actions, busy }: ModeProps) {
         {moreClues ? t("who.revealNext") : t("who.allRevealed")}
       </button>
 
-      <ReviewFlags q={q} />
       <AnswerReveal answer={q.answerText} explanation={q.explanation} />
 
       <div>

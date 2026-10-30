@@ -16,7 +16,7 @@ import {
  * deleting, rewriting, or fabricating content.
  */
 
-export type SourceFile = "religious" | "geography";
+export type SourceFile = "religious" | "geography" | "mathematics" | "football" | "lebanon";
 
 export interface MappedQuestion {
   type: QuestionType;

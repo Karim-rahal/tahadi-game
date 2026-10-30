@@ -10,6 +10,7 @@ import { getGameToken, saveGameHint } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { Logo } from "@/components/Logo";
 import { LangToggle } from "@/components/LangToggle";
+import { Disclaimer } from "@/components/Disclaimer";
 import { Scoreboard } from "@/components/Scoreboard";
 import { FastestScreen } from "./FastestScreen";
 import { WhoAmIScreen } from "./WhoAmIScreen";
@@ -246,6 +247,8 @@ export function GameClient({ gameId }: { gameId: string }) {
           ) : null}
         </AnimatePresence>
       </div>
+
+      {!finished && <Disclaimer className="mt-6" />}
 
       {/* Control bar — no Next button; advancement is automatic. */}
       {!finished && (

@@ -37,10 +37,21 @@ export const DIFFICULTY_FROM_AR: Record<string, Difficulty> = Object.fromEntries
  * importer never silently drops a record because of a stray character.
  * Returns null for unknown input (caller decides how to handle).
  */
+/** English canonical values used by the newer question-bank JSON format. */
+const QUESTION_TYPE_FROM_EN: Record<string, QuestionType> = {
+  fastest_answer: "FASTEST",
+  fastest: "FASTEST",
+  who_am_i: "WHO_AM_I",
+  true_false: "TRUE_FALSE",
+  enumeration: "ENUMERATE",
+  enumerate: "ENUMERATE",
+};
+
 export function questionTypeFromArabic(raw: string | null | undefined): QuestionType | null {
   if (!raw) return null;
   const s = raw.trim();
   if (QUESTION_TYPE_FROM_AR[s]) return QUESTION_TYPE_FROM_AR[s]!;
+  if (QUESTION_TYPE_FROM_EN[s.toLowerCase()]) return QUESTION_TYPE_FROM_EN[s.toLowerCase()]!;
   // Tolerate "من أنا" without the question mark, and stray whitespace.
   const normalized = s.replace(/\s+/g, " ").replace(/؟/g, "").trim();
   if (normalized === "من أنا") return "WHO_AM_I";
@@ -54,6 +65,10 @@ export function difficultyFromArabic(raw: string | null | undefined): Difficulty
   if (!raw) return null;
   const s = raw.trim();
   if (DIFFICULTY_FROM_AR[s]) return DIFFICULTY_FROM_AR[s]!;
+  const en = s.toLowerCase();
+  if (en === "easy") return "EASY";
+  if (en === "medium") return "MEDIUM";
+  if (en === "hard") return "HARD";
   if (s === "سهله") return "EASY";
   if (s === "متوسطة") return "MEDIUM";
   if (s === "صعبه") return "HARD";
