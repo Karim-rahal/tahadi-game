@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import clsx from "clsx";
-import { ChevronLeft, Loader2, Minus, SkipForward, Trophy } from "lucide-react";
+import { ChevronLeft, Loader2, Minus, SkipForward, Swords, Trophy } from "lucide-react";
 import type { GameState, JudgeQuestionDto, TeamSide } from "@/lib/types";
 
 interface Outcome {
@@ -54,7 +54,17 @@ function outcomeOf(q: JudgeQuestionDto, state: GameState): Outcome {
   return { tone: "neutral", headline: "بلا نقطة", sub: q.type === "TRUE_FALSE" ? "إجابة غير صحيحة" : null, icon: "tie" };
 }
 
-export function ResultTransition({ q, state, last }: { q: JudgeQuestionDto; state: GameState; last: boolean }) {
+export function ResultTransition({
+  q,
+  state,
+  last,
+  tiebreakNext,
+}: {
+  q: JudgeQuestionDto;
+  state: GameState;
+  last: boolean;
+  tiebreakNext?: boolean;
+}) {
   const o = outcomeOf(q, state);
   const Icon = o.icon === "trophy" ? Trophy : o.icon === "skip" ? SkipForward : Minus;
 
@@ -98,7 +108,9 @@ export function ResultTransition({ q, state, last }: { q: JudgeQuestionDto; stat
       </div>
 
       <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-        {last ? (
+        {tiebreakNext ? (
+          <><Swords size={14} /> تعادل — جولة حسم قادمة</>
+        ) : last ? (
           <>عرض النتيجة النهائية <ChevronLeft size={14} /></>
         ) : (
           <>

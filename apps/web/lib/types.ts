@@ -12,6 +12,7 @@ export interface GameState {
   answeredCount: number;
   winner: TeamSide | null;
   isTie: boolean;
+  tiebreaker: boolean;
   settings: GameSettings;
   canUndo: boolean;
   current: JudgeQuestionDto | null;

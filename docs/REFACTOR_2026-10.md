@@ -31,6 +31,14 @@ destructive migration — the schema is unchanged.
 - Idempotency keys + a "already answered" guard + transactional writes prevent
   double scoring on double-tap or retry. Undo reverses the latest action,
   including after automatic advancement.
+- **صح أم خطأ fairness:** each match now has an **even** number of true/false
+  questions so both teams own the same count (the odd one is swapped for another
+  type, or dropped). `buildMatchPlan` in `apps/api/src/services/selection.ts`.
+- **Tie-breaker:** a match that ends level plays a sudden-death decider — a
+  random unused question (preferring الأسرع يجاوب / من أنا؟ so both teams can
+  compete); the winner takes the point. A drawn decider spawns another until the
+  tie is broken (or no questions remain). Tie-breaker questions are appended at
+  order ≥ 1000 so they don't count toward match length (no schema change).
 
 ## Compatibility with historical matches
 

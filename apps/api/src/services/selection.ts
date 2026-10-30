@@ -81,6 +81,32 @@ export async function buildMatchPlan(
     }
   }
 
+  // Fairness: صح أم خطأ is strictly turn-based, so each team must own the SAME
+  // number of them. Keep the TRUE_FALSE count even — swap the odd one out for a
+  // leftover question of another type (preserving the total), or drop it when no
+  // other type is available.
+  const tfCount = picked.filter((p) => p.type === "TRUE_FALSE").length;
+  if (tfCount % 2 === 1) {
+    let lastTf = -1;
+    for (let i = picked.length - 1; i >= 0; i--) {
+      if (picked[i]!.type === "TRUE_FALSE") {
+        lastTf = i;
+        break;
+      }
+    }
+    let replacement: { id: string; type: QuestionType; difficulty: Difficulty } | undefined;
+    for (const [t, list] of byType) {
+      if (t !== "TRUE_FALSE" && list.length) {
+        replacement = list.pop();
+        break;
+      }
+    }
+    if (lastTf >= 0) {
+      if (replacement) picked[lastTf] = replacement;
+      else picked.splice(lastTf, 1);
+    }
+  }
+
   // Assign order + TRUE_FALSE ownership (k-th TF question alternates).
   let tfIndex = 0;
   return picked.map((p, i) => {

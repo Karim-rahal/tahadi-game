@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, Flag, Loader2, Pause, Play, SkipForward, Undo2 } from "lucide-react";
+import { ChevronRight, Flag, Loader2, Pause, Play, SkipForward, Swords, Undo2 } from "lucide-react";
 import type { GameState, TeamSide } from "@/lib/types";
 import { api, ApiError } from "@/lib/api";
 import { getGameToken, saveGameHint } from "@/lib/store";
@@ -126,6 +126,9 @@ export function GameClient({ gameId }: { gameId: string }) {
   const resultPhase =
     !!q && (q.status === "ANSWERED" || q.status === "SKIPPED") && state?.status === "ACTIVE";
   const isLastResult = !!state && state.answeredCount >= state.totalQuestions;
+  // A tie after the last question (or a drawn decider) → finish() starts another
+  // sudden-death round. Scores here already include the point just awarded.
+  const willTiebreak = !!state && isLastResult && state.teams.A.score === state.teams.B.score;
 
   // Automatic advancement: once a question is resolved, show the result for a
   // short beat, then advance (or finish on the last question). No manual click.
@@ -191,8 +194,12 @@ export function GameClient({ gameId }: { gameId: string }) {
 
       <Scoreboard state={state} activeTeam={resultPhase ? q?.answeredByTeam ?? null : activeTeam} />
 
-      {/* Progress */}
-      {!finished && (
+      {/* Progress — or the sudden-death banner during a tie-breaker */}
+      {!finished && state.tiebreaker ? (
+        <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-ink px-4 py-2.5 text-center text-sm font-semibold text-white">
+          <Swords size={16} /> جولة الحسم — تعادل! الفائز بهذا السؤال يكسب المباراة
+        </div>
+      ) : !finished ? (
         <div className="mt-3 flex items-center gap-3 text-xs text-ink-muted">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
             <div
@@ -202,7 +209,7 @@ export function GameClient({ gameId }: { gameId: string }) {
           </div>
           <span className="tnum">{state.answeredCount}/{state.totalQuestions}</span>
         </div>
-      )}
+      ) : null}
 
       {error && <div className="mt-3 rounded-xl border border-bad-500/30 bg-bad-50 p-3 text-sm font-medium text-bad-600">{error}</div>}
 
@@ -218,7 +225,7 @@ export function GameClient({ gameId }: { gameId: string }) {
               <button className="btn-primary" disabled={busy} onClick={() => actions.resume()}><Play size={18} /> استئناف</button>
             </motion.div>
           ) : resultPhase && q ? (
-            <ResultTransition key={`result-${q.gameQuestionId}`} q={q} state={state} last={isLastResult} />
+            <ResultTransition key={`result-${q.gameQuestionId}`} q={q} state={state} last={isLastResult && !willTiebreak} tiebreakNext={willTiebreak} />
           ) : noMore ? (
             <motion.div key="nomore" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card flex flex-col items-center gap-4 p-10 text-center">
               <p className="text-lg font-semibold text-ink">انتهت أسئلة المباراة</p>

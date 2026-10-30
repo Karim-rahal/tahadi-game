@@ -4,11 +4,14 @@ import {
   type GameSettings,
   type JudgeQuestionDto,
   type MatchSelection,
+  type QuestionType,
   type TeamSide,
   ENUM_PASSES_PER_TEAM,
   ENUM_STRIKES_PER_TEAM,
   POINTS_PER_QUESTION,
+  QUESTION_TYPES,
   computeAnswerPoints,
+  matchSelectionSchema,
   matchWinner,
   otherTeam,
   resolveEnumeration,
@@ -18,6 +21,13 @@ import { prisma } from "../db";
 import { badRequest, conflict, notFound } from "../lib/http";
 
 type Tx = Prisma.TransactionClient;
+
+/**
+ * Tie-breaker (sudden-death) questions are appended with orders from this base
+ * so they're trivially distinguishable from the main plan without a schema
+ * change. The main match never reaches this many questions (max 200).
+ */
+const TIEBREAKER_ORDER_BASE = 1000;
 
 /** Generic, interpretable inverse for undo. */
 interface Inverse {
@@ -648,10 +658,76 @@ export async function setStatus(gameId: string, status: "PAUSED" | "ACTIVE"): Pr
   return getState(gameId);
 }
 
+/** Pick a random unused eligible question of one of `types`, or null. */
+async function pickRandomQuestion(
+  tx: Tx,
+  selection: MatchSelection,
+  excludeIds: string[],
+  types: QuestionType[],
+): Promise<{ id: string; type: QuestionType } | null> {
+  const cands = await tx.question.findMany({
+    where: {
+      categoryId: { in: selection.categoryIds },
+      type: { in: types },
+      disabled: false,
+      ...(selection.excludeFlaggedForReview ? { flaggedForReview: false } : {}),
+      id: { notIn: excludeIds },
+    },
+    select: { id: true, type: true },
+    take: 500,
+  });
+  if (cands.length === 0) return null;
+  const c = cands[Math.floor(Math.random() * cands.length)]!;
+  return { id: c.id, type: c.type as QuestionType };
+}
+
+/**
+ * Start a sudden-death tie-breaker: append a fresh random question (preferring
+ * الأسرع يجاوب / من أنا؟ so both teams can compete) and make it current. The
+ * winner takes the deciding point; a drawn decider spawns another. Returns false
+ * when no eligible question is left (then the match is left as a true tie).
+ */
+async function startTiebreaker(gameId: string, selectionRaw: unknown): Promise<boolean> {
+  const selection = matchSelectionSchema.parse(selectionRaw);
+  return prisma.$transaction(async (tx) => {
+    const game = await tx.gameSession.findUniqueOrThrow({ where: { id: gameId } });
+    const existing = await tx.gameQuestion.findMany({ where: { gameId }, select: { questionId: true, order: true } });
+    const usedIds = existing.map((e) => e.questionId);
+    const tbCount = existing.filter((e) => e.order >= TIEBREAKER_ORDER_BASE).length;
+
+    const chosen =
+      (await pickRandomQuestion(tx, selection, usedIds, ["FASTEST", "WHO_AM_I"])) ??
+      (await pickRandomQuestion(tx, selection, usedIds, [...QUESTION_TYPES]));
+    if (!chosen) return false;
+
+    const order = TIEBREAKER_ORDER_BASE + tbCount;
+    const gq = await tx.gameQuestion.create({
+      data: {
+        gameId,
+        questionId: chosen.id,
+        order,
+        status: "PENDING",
+        // A TRUE_FALSE decider (last-resort) is owned by the starting team.
+        ownerTeam: chosen.type === "TRUE_FALSE" ? (game.startingTeam as TeamSide) : undefined,
+      },
+    });
+    await tx.gameSession.update({ where: { id: gameId }, data: { currentIndex: order, status: "ACTIVE" } });
+    await activateQuestion(tx, gameId, gq.id, chosen.type, game.startingTeam as TeamSide);
+    return true;
+  });
+}
+
 export async function finishGame(gameId: string): Promise<GameStateDto> {
   const game = await loadGameOrThrow(gameId);
+  if (game.status === "FINISHED") return getState(gameId);
   const a = game.teams.find((t) => t.side === "A")?.score ?? 0;
   const b = game.teams.find((t) => t.side === "B")?.score ?? 0;
+
+  // Tie → play a sudden-death decider instead of finishing, if one is available.
+  if (a === b && (await startTiebreaker(gameId, game.selection))) {
+    return getState(gameId);
+  }
+
   const w = matchWinner(a, b);
   await prisma.gameSession.update({
     where: { id: gameId },
@@ -677,6 +753,8 @@ export interface GameStateDto {
   answeredCount: number;
   winner: TeamSide | null;
   isTie: boolean;
+  /** The current question is a sudden-death tie-breaker. */
+  tiebreaker: boolean;
   settings: GameSettings;
   canUndo: boolean;
   current: JudgeQuestionDto | null;
@@ -696,7 +774,9 @@ export async function getState(gameId: string): Promise<GameStateDto> {
 
   const teamA = game.teams.find((t) => t.side === "A");
   const teamB = game.teams.find((t) => t.side === "B");
-  const answeredCount = game.questions.filter((q) => q.status === "ANSWERED" || q.status === "SKIPPED").length;
+  // Tie-breakers are "extra" — they don't count toward the match length/progress.
+  const mainQuestions = game.questions.filter((q) => q.order < TIEBREAKER_ORDER_BASE);
+  const answeredCount = mainQuestions.filter((q) => q.status === "ANSWERED" || q.status === "SKIPPED").length;
 
   const undoable = await prisma.gameActionHistory.count({ where: { gameId, undone: false } });
 
@@ -711,14 +791,15 @@ export async function getState(gameId: string): Promise<GameStateDto> {
       B: { name: teamB?.name ?? "الفريق ب", score: teamB?.score ?? 0 },
     },
     currentIndex: game.currentIndex,
-    totalQuestions: game.questions.length,
+    totalQuestions: mainQuestions.length,
     answeredCount,
     winner: (game.winner as TeamSide | null) ?? null,
     isTie: game.isTie,
+    tiebreaker: game.currentIndex >= TIEBREAKER_ORDER_BASE,
     settings,
     canUndo: undoable > 0,
     current,
-    progress: game.questions.map((q) => ({
+    progress: mainQuestions.map((q) => ({
       order: q.order,
       type: q.question.type,
       difficulty: q.question.difficulty,
@@ -774,6 +855,7 @@ async function buildCurrentDto(gameId: string, currentIndex: number): Promise<Ju
     sourceReference: q.sourceReference,
     flaggedForReview: q.flaggedForReview,
     acceptedAnswersIncomplete: q.acceptedAnswersIncomplete,
+    isTiebreaker: gq.order >= TIEBREAKER_ORDER_BASE,
     answeredByTeam: (gq.answeredByTeam as TeamSide | null) ?? null,
     pointsAwarded: gq.pointsAwarded,
     answeredCorrect: gq.answeredCorrect,

@@ -143,6 +143,8 @@ export interface JudgeQuestionDto {
   sourceReference: string | null;
   flaggedForReview: boolean;
   acceptedAnswersIncomplete: boolean;
+  /** Sudden-death decider played after a tied match — winner takes the point. */
+  isTiebreaker: boolean;
   /** ── Result of this question (populated once status is ANSWERED/SKIPPED) ── */
   /** Team that received the point, or null (no point / tie / skipped). */
   answeredByTeam: "A" | "B" | null;
