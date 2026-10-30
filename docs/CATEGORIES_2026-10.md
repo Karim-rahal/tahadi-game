@@ -67,6 +67,31 @@ The **alias / answer-group schema** is therefore deferred to the football work,
 where aliases are abundant and essential. Lebanon's raw groups are preserved in
 `rawMetadata` for when that feature lands.
 
+## كرة القدم — Football — PARTIAL (verified winners-core, 385)
+
+The supplied 1,200 draft was winner-template-heavy and off-spec, so it was NOT
+imported. Instead a **deterministically-correct "winners core"** is generated
+(`scripts/gen_football.py`) from champion/winner tables that were web-confirmed
+(UCL & EPL recent years, World Cup 1930–2022, Euro through 2024, Copa 2024) and
+cross-checked for internal consistency. **385 questions**, in
+`data/football/football_core.json`:
+
+- fastest-answer 200 (who won competition X in year Y — big-5 leagues, UCL, WC,
+  Euro, Copa), true/false 154 (balanced 77/77), enumeration 19 (distinct winners
+  of a competition over a period — exhaustive within scope, with **club aliases**
+  like "Manchester United"), who-am-i 12 (clubs; clues derived only from the
+  verified title tables).
+- Serie A 2005 & 2006 are omitted (Calciopoli — contested/revoked titles); no
+  unfinished competition is included.
+- This exercises the new answer-group alias feature with real data.
+
+**NOT delivered (honest shortfall):** this is the verifiable winners core, not
+the full 1,200 with the required topic distribution (Ligue 1 share, Europa
+League, players/transfers/records) or the breadth of variety (player careers,
+transfers, managers, memorable matches, golden boots, rivalries, stadiums). That
+content is verifiable per-fact but not at 1,200-scale in one pass, and is the
+remaining football work. The accuracy disclaimer applies.
+
 ## Flagged-question feature — REMOVED (player-facing)
 
 - Setup: the "استبعاد الأسئلة الموسومة للمراجعة" checkbox is gone.
@@ -88,12 +113,13 @@ A small, subtle RTL/EN note on home, setup, and the game screen:
 
 ## Deferred (still NOT done)
 
-- Football (1,200): held back. The draft is winner-template-heavy and its topic
-  split doesn't match the spec; it needs factual source-verification and
-  rebuilding. Football enumeration has rich aliases, so the **alias /
-  answer-group schema** (column + importer + DTO + enumeration UI with search)
-  will be built as part of the football work.
+- Football beyond the winners-core: the remaining ~800+ to reach 1,200, the exact
+  topic distribution, and the variety modes (players/transfers/managers/records/
+  memorable matches) — a per-fact research effort.
 - The broader "premium frontend refinement" pass (Part 11).
+
+The alias / answer-group schema (column + importer + DTO + enumeration UI with
+search) is now DONE and used by football.
 
 ## Tests
 

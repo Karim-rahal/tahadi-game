@@ -61,6 +61,16 @@ async function main() {
       dryRun,
     }),
   );
+  results.push(
+    await importFile({
+      filePath: path.join(dataDir, "football", "football_core.json"),
+      sourceFile: "football",
+      categorySlug: "football",
+      categoryNameAr: "كرة القدم",
+      reportDir: docsDir,
+      dryRun,
+    }),
+  );
 
   for (const r of results) {
     logger.info(
