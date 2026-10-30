@@ -51,6 +51,16 @@ async function main() {
       dryRun,
     }),
   );
+  results.push(
+    await importFile({
+      filePath: path.join(dataDir, "lebanon", "lebanon_600_playtest.json"),
+      sourceFile: "lebanon",
+      categorySlug: "lebanon",
+      categoryNameAr: "لبنان",
+      reportDir: docsDir,
+      dryRun,
+    }),
+  );
 
   for (const r of results) {
     logger.info(

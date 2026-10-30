@@ -42,6 +42,31 @@ sets `dir="ltr"`), so operators/numbers are never bidi-reordered in the RTL UI.
   AcceptedAnswer model does not represent — that schema work is deferred with
   those categories.**
 
+## لبنان — Lebanon (600) — IMPORTED
+
+Imported from the supplied draft (`data/lebanon/lebanon_600_playtest.json`),
+after verification. 150 per mode (fastest / who-am-i / true-false / enumeration).
+
+Verification done (deterministic + sample):
+- **Administrative boundaries** (your flagged risk): all district/governorate
+  enumerations checked against Lebanon's 8-governorate structure — **51/51
+  deterministically correct, 0 mismatches** (guarded by a regression test).
+- Enumeration is bounded ("pick from these options") — **every accepted answer
+  is within the shown options, 0 strays**; true/false is balanced (75/75);
+  who-am-i clues are progressive (broad first, answer never in clue 1).
+- Web-verified a sample of well-known facts (independence 1943 / Nov 22, first
+  president Bechara El Khoury, PM Riad Al Solh, Chamoun 1952–58, Greater Lebanon
+  1920, civil war ended 1990, July War 2006) — all correct.
+- **Not** done: individual source-verification of the long tail (obscure
+  villages, minor personalities). Covered by the accuracy disclaimer; internal
+  `review_status` kept.
+
+Lebanon's enumeration answer-groups are all single-variant (0 of 908 carry an
+alias), so the flat accepted-answer model imports them correctly with no loss.
+The **alias / answer-group schema** is therefore deferred to the football work,
+where aliases are abundant and essential. Lebanon's raw groups are preserved in
+`rawMetadata` for when that feature lands.
+
 ## Flagged-question feature — REMOVED (player-facing)
 
 - Setup: the "استبعاد الأسئلة الموسومة للمراجعة" checkbox is gone.
@@ -61,13 +86,13 @@ A small, subtle RTL/EN note on home, setup, and the game screen:
 "قد تحتوي بعض الأسئلة أو الإجابات على معلومات غير دقيقة. نرحّب بملاحظاتكم لتحسين اللعبة."
 (`components/Disclaimer.tsx`, i18n `disclaimer.text`). No banner, no modal.
 
-## Deferred (NOT done this session)
+## Deferred (still NOT done)
 
-- Football (1,200) and Lebanon (600): held back. The football draft is
-  winner-template-heavy and its topic split doesn't match the spec; both need
-  factual source-verification and (football) rebuilding. Enumeration
-  answer-groups also need schema support before import.
-- Individual external source-verification of football/Lebanon facts.
+- Football (1,200): held back. The draft is winner-template-heavy and its topic
+  split doesn't match the spec; it needs factual source-verification and
+  rebuilding. Football enumeration has rich aliases, so the **alias /
+  answer-group schema** (column + importer + DTO + enumeration UI with search)
+  will be built as part of the football work.
 - The broader "premium frontend refinement" pass (Part 11).
 
 ## Tests
