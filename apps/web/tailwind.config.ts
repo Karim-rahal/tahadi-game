@@ -32,12 +32,12 @@ const config: Config = {
           700: "#0A6174",
         },
         teamB: {
-          50: "#FBE7F3",
-          100: "#F6CFE6",
-          400: "#DC4FAC",
-          500: "#C32E91",
-          600: "#A31F76",
-          700: "#81175D",
+          50: "#FFF4ED",
+          100: "#FFE4CC",
+          400: "#FB923C",
+          500: "#F97316",
+          600: "#EA580C",
+          700: "#C2410C",
         },
         good: { 50: "#E8F6ED", 500: "#15A34A", 600: "#12823B" },
         bad: { 50: "#FBEAEA", 500: "#DC2626", 600: "#B91C1C" },
@@ -56,7 +56,7 @@ const config: Config = {
         card: "0 2px 4px rgba(25,21,34,0.04), 0 18px 40px -24px rgba(25,21,34,0.28)",
         pop: "0 10px 30px -10px rgba(25,21,34,0.35)",
         teamA: "0 14px 36px -16px rgba(14,156,184,0.55)",
-        teamB: "0 14px 36px -16px rgba(195,46,145,0.5)",
+        teamB: "0 14px 36px -16px rgba(249,115,22,0.5)",
       },
       keyframes: {
         "fade-up": {

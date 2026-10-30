@@ -18,9 +18,11 @@ export default function HomePage() {
       </header>
 
       <section className="flex flex-1 flex-col items-center justify-center py-8 text-center">
-        <h1 className="font-display text-5xl font-bold leading-[1.1] text-ink sm:text-6xl" dir="rtl">
+        <h1 className="font-display text-5xl font-bold leading-[1.35] text-ink sm:text-6xl" dir="rtl">
           تحدي{" "}
-          <span className="bg-gradient-to-l from-teamA-500 to-teamB-500 bg-clip-text text-transparent">الدروندي</span>
+          <span className="inline-block bg-gradient-to-bl from-teamA-700 via-teamA-500 to-teamA-400 bg-clip-text pb-[0.18em] text-transparent">
+            الدروندي
+          </span>
         </h1>
 
         {/* The duel — the signature motif: two teams meeting across a seam. */}

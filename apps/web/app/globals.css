@@ -16,8 +16,8 @@ body {
 body {
   /* Bright warm-neutral stage with two faint team-coloured spotlights. */
   background:
-    radial-gradient(1200px 680px at 100% -8%, rgba(14, 156, 184, 0.08), transparent 55%),
-    radial-gradient(1100px 640px at 0% 108%, rgba(195, 46, 145, 0.07), transparent 55%),
+    radial-gradient(1200px 680px at 100% -8%, rgba(14, 156, 184, 0.09), transparent 55%),
+    radial-gradient(1100px 640px at 0% 108%, rgba(249, 115, 22, 0.07), transparent 55%),
     #f3f2ef;
   background-attachment: fixed;
   color: #191522;
