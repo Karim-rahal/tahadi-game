@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import type { GameState, TeamSide } from "@/lib/types";
+import { useLang } from "@/lib/i18n";
 
 function TeamSide_({
   side,
@@ -15,6 +16,7 @@ function TeamSide_({
   score: number;
   active: boolean;
 }) {
+  const { t } = useLang();
   const isA = side === "A";
   return (
     <div
@@ -41,7 +43,7 @@ function TeamSide_({
         {score}
       </motion.div>
       {active && (
-        <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/85">دوره الآن</div>
+        <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/85">{t("sb.turn")}</div>
       )}
     </div>
   );

@@ -23,10 +23,13 @@ import { badRequest, conflict, notFound } from "../lib/http";
 type Tx = Prisma.TransactionClient;
 
 /**
- * Tie-breaker (sudden-death) questions are appended with orders from this base
- * so they're trivially distinguishable from the main plan without a schema
- * change. The main match never reaches this many questions (max 200).
+ * Order ranges let us distinguish question kinds without a schema change:
+ *   0..499        the original planned match (the N the judge chose)
+ *   500..999      replacements added when a question is skipped
+ *   1000+         sudden-death tie-breakers
+ * The main match is capped at 200 questions, so these ranges never collide.
  */
+const REPLACEMENT_ORDER_BASE = 500;
 const TIEBREAKER_ORDER_BASE = 1000;
 
 /** Generic, interpretable inverse for undo. */
@@ -36,6 +39,7 @@ interface Inverse {
   deleteUsedAnswerIds?: string[];
   deleteStrikeIds?: string[];
   deletePassIds?: string[];
+  deleteGameQuestionIds?: string[];
   gameQuestionRestore?: {
     id: string;
     status?: string;
@@ -572,15 +576,42 @@ export async function enumeratePass(
 export async function skipQuestion(gameId: string, idempotencyKey?: string): Promise<GameStateDto> {
   const game = await loadGameOrThrow(gameId);
   if (game.status !== "ACTIVE") throw conflict("اللعبة ليست نشطة");
+  const selection = matchSelectionSchema.parse(game.selection);
   await prisma.$transaction(async (tx) => {
     if (await alreadyProcessed(tx, gameId, idempotencyKey, "skip")) return;
-    const gq = await tx.gameQuestion.findFirst({ where: { gameId, order: game.currentIndex } });
+    const gq = await tx.gameQuestion.findFirst({ where: { gameId, order: game.currentIndex }, include: { question: true } });
     if (!gq) throw notFound("لا يوجد سؤال حالي");
     const prevStatus = gq.status;
     await tx.gameQuestion.update({ where: { id: gq.id }, data: { status: "SKIPPED", endedAt: new Date() } });
-    await recordHistory(tx, gameId, "skip", `تخطّي السؤال ${gq.order + 1}`, { order: gq.order }, {
-      gameQuestionRestore: { id: gq.id, status: prevStatus },
-    });
+
+    // Skipping must not cost the match a question — append a replacement so the
+    // target number of ANSWERED questions is still reached. Prefer the same
+    // type (a true/false replacement keeps the skipped one's team ownership).
+    const existing = await tx.gameQuestion.findMany({ where: { gameId }, select: { questionId: true, order: true } });
+    const usedIds = existing.map((e) => e.questionId);
+    const replCount = existing.filter((e) => e.order >= REPLACEMENT_ORDER_BASE && e.order < TIEBREAKER_ORDER_BASE).length;
+    const skippedType = gq.question.type as QuestionType;
+    const replacement =
+      (await pickRandomQuestion(tx, selection, usedIds, [skippedType])) ??
+      (await pickRandomQuestion(tx, selection, usedIds, QUESTION_TYPES.filter((t) => t !== "TRUE_FALSE")));
+
+    const inverse: Inverse = { gameQuestionRestore: { id: gq.id, status: prevStatus } };
+    if (replacement) {
+      const repl = await tx.gameQuestion.create({
+        data: {
+          gameId,
+          questionId: replacement.id,
+          order: REPLACEMENT_ORDER_BASE + replCount,
+          status: "PENDING",
+          // A true/false replacement inherits the skipped question's owner so
+          // the per-team true/false balance is preserved.
+          ownerTeam: replacement.type === "TRUE_FALSE" ? (gq.ownerTeam as TeamSide | null) ?? undefined : undefined,
+        },
+      });
+      inverse.deleteGameQuestionIds = [repl.id];
+    }
+
+    await recordHistory(tx, gameId, "skip", `تخطّي السؤال ${gq.order + 1}`, { order: gq.order }, inverse);
   });
   return getState(gameId);
 }
@@ -621,6 +652,7 @@ export async function undo(gameId: string): Promise<GameStateDto> {
     if (inv.deleteUsedAnswerIds?.length) await tx.enumerationUsedAnswer.deleteMany({ where: { id: { in: inv.deleteUsedAnswerIds } } });
     if (inv.deleteStrikeIds?.length) await tx.strike.deleteMany({ where: { id: { in: inv.deleteStrikeIds } } });
     if (inv.deletePassIds?.length) await tx.pass.deleteMany({ where: { id: { in: inv.deletePassIds } } });
+    if (inv.deleteGameQuestionIds?.length) await tx.gameQuestion.deleteMany({ where: { id: { in: inv.deleteGameQuestionIds } } });
 
     if (inv.gameQuestionRestore) {
       const r = inv.gameQuestionRestore;
@@ -774,9 +806,14 @@ export async function getState(gameId: string): Promise<GameStateDto> {
 
   const teamA = game.teams.find((t) => t.side === "A");
   const teamB = game.teams.find((t) => t.side === "B");
-  // Tie-breakers are "extra" — they don't count toward the match length/progress.
-  const mainQuestions = game.questions.filter((q) => q.order < TIEBREAKER_ORDER_BASE);
-  const answeredCount = mainQuestions.filter((q) => q.status === "ANSWERED" || q.status === "SKIPPED").length;
+  // The match length is the original plan (orders < 500). Replacements (added
+  // for skips) and tie-breakers are "extra" and don't change the target count.
+  // Skipped questions don't count as progress — they're replaced — so only
+  // ANSWERED questions (plan + replacements) advance the bar toward the target.
+  const planQuestions = game.questions.filter((q) => q.order < REPLACEMENT_ORDER_BASE);
+  const answeredCount = game.questions.filter(
+    (q) => q.order < TIEBREAKER_ORDER_BASE && q.status === "ANSWERED",
+  ).length;
 
   const undoable = await prisma.gameActionHistory.count({ where: { gameId, undone: false } });
 
@@ -791,7 +828,7 @@ export async function getState(gameId: string): Promise<GameStateDto> {
       B: { name: teamB?.name ?? "الفريق ب", score: teamB?.score ?? 0 },
     },
     currentIndex: game.currentIndex,
-    totalQuestions: mainQuestions.length,
+    totalQuestions: planQuestions.length,
     answeredCount,
     winner: (game.winner as TeamSide | null) ?? null,
     isTie: game.isTie,
@@ -799,7 +836,7 @@ export async function getState(gameId: string): Promise<GameStateDto> {
     settings,
     canUndo: undoable > 0,
     current,
-    progress: mainQuestions.map((q) => ({
+    progress: planQuestions.map((q) => ({
       order: q.order,
       type: q.question.type,
       difficulty: q.question.difficulty,

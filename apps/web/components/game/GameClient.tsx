@@ -3,28 +3,31 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, Flag, Loader2, Pause, Play, SkipForward, Swords, Undo2 } from "lucide-react";
+import { ChevronLeft, Flag, Loader2, Pause, Play, SkipForward, Swords, Undo2 } from "lucide-react";
 import type { GameState, TeamSide } from "@/lib/types";
 import { api, ApiError } from "@/lib/api";
 import { getGameToken, saveGameHint } from "@/lib/store";
+import { useLang } from "@/lib/i18n";
 import { Logo } from "@/components/Logo";
+import { LangToggle } from "@/components/LangToggle";
 import { Scoreboard } from "@/components/Scoreboard";
-import { statusLabel } from "@/lib/labels";
 import { FastestScreen } from "./FastestScreen";
 import { WhoAmIScreen } from "./WhoAmIScreen";
 import { TrueFalseScreen } from "./TrueFalseScreen";
 import { EnumerateScreen } from "./EnumerateScreen";
 import { WinnerScreen } from "./WinnerScreen";
 import { ResultTransition } from "./ResultTransition";
+import { RefTimer } from "./RefTimer";
 import type { GameActions } from "./types";
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 const RESULT_MS = 1700;
 
 export function GameClient({ gameId }: { gameId: string }) {
+  const { t } = useLang();
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [fatal, setFatal] = useState<string | null>(null);
+  const [fatalKey, setFatalKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const tokenRef = useRef<string | null>(null);
 
@@ -33,22 +36,22 @@ export function GameClient({ gameId }: { gameId: string }) {
     try {
       const s = await api<GameState>(`/games/${gameId}`, { token: tokenRef.current });
       setState(s);
-      setFatal(null);
+      setFatalKey(null);
     } catch (e) {
       if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
         if (tokenRef.current) {
           try {
             const s = await api<GameState>(`/games/${gameId}/claim`, { method: "POST", body: { token: tokenRef.current } });
             setState(s);
-            setFatal(null);
+            setFatalKey(null);
             return;
           } catch {
             /* fall through */
           }
         }
-        setFatal("لا تملك صلاحية الوصول إلى هذه المباراة على هذا الجهاز.");
+        setFatalKey("game.loadFatalAccess");
       } else {
-        setFatal("تعذّر تحميل المباراة. تحقّق من الاتصال وحاول مجدداً.");
+        setFatalKey("game.loadFatal");
       }
     }
   }, [gameId]);
@@ -75,15 +78,14 @@ export function GameClient({ gameId }: { gameId: string }) {
       setBusy(true);
       setError(null);
       try {
-        const s = await fn();
-        setState(s);
+        setState(await fn());
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : "حدث خطأ، حاول مرة أخرى.");
+        setError(e instanceof ApiError ? e.message : t("game.error"));
       } finally {
         setBusy(false);
       }
     },
-    [busy],
+    [busy, t],
   );
 
   const post = useCallback(
@@ -92,7 +94,6 @@ export function GameClient({ gameId }: { gameId: string }) {
     [gameId],
   );
 
-  // `run` returns void; keep a ref so the auto-advance timer always calls the latest.
   const actionsRef = useRef<GameActions | null>(null);
 
   const actions: GameActions = {
@@ -106,7 +107,7 @@ export function GameClient({ gameId }: { gameId: string }) {
     start: () => run(() => post("/start")),
     next: () => run(() => post("/next-question", { idempotencyKey: uid() })),
     undo: () => run(() => post("/undo")),
-    adjust: (team, delta) => run(() => post("/score", { team, delta, reason: "تعديل يدوي" })),
+    adjust: (team, delta) => run(() => post("/score", { team, delta, reason: "manual" })),
     pause: () => run(() => post("/pause")),
     resume: () => run(() => post("/resume")),
     finish: () => run(() => post("/finish")),
@@ -116,7 +117,7 @@ export function GameClient({ gameId }: { gameId: string }) {
         await api("/reports", { method: "POST", body: { questionId: state.current.questionId, reason, gameId } });
         setError(null);
       } catch {
-        setError("تعذّر إرسال البلاغ.");
+        setError(t("report.err"));
       }
     },
   };
@@ -126,31 +127,26 @@ export function GameClient({ gameId }: { gameId: string }) {
   const resultPhase =
     !!q && (q.status === "ANSWERED" || q.status === "SKIPPED") && state?.status === "ACTIVE";
   const isLastResult = !!state && state.answeredCount >= state.totalQuestions;
-  // A tie after the last question (or a drawn decider) → finish() starts another
-  // sudden-death round. Scores here already include the point just awarded.
   const willTiebreak = !!state && isLastResult && state.teams.A.score === state.teams.B.score;
 
-  // Automatic advancement: once a question is resolved, show the result for a
-  // short beat, then advance (or finish on the last question). No manual click.
   useEffect(() => {
     if (!resultPhase) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       const a = actionsRef.current;
       if (!a) return;
       if (isLastResult) void a.finish();
       else void a.next();
     }, RESULT_MS);
-    return () => clearTimeout(t);
-    // Re-keyed per resolved question so re-answering after an undo re-arms it.
+    return () => clearTimeout(timer);
   }, [resultPhase, q?.gameQuestionId, q?.status, isLastResult]);
 
-  if (fatal) {
+  if (fatalKey) {
     return (
       <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
-        <p className="text-lg text-ink">{fatal}</p>
+        <p className="text-lg text-ink">{t(fatalKey)}</p>
         <div className="flex gap-3">
-          <button className="btn-soft" onClick={() => void load()}>إعادة المحاولة</button>
-          <Link href="/games" className="btn-primary">المباريات المحفوظة</Link>
+          <button className="btn-soft" onClick={() => void load()}>{t("common.retry")}</button>
+          <Link href="/games" className="btn-primary">{t("game.savedMatches")}</Link>
         </div>
       </div>
     );
@@ -159,7 +155,7 @@ export function GameClient({ gameId }: { gameId: string }) {
   if (!state) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-ink-muted">
-        <Loader2 className="me-2 animate-spin" /> جارِ التحميل…
+        <Loader2 className="me-2 animate-spin" /> {t("common.loading")}
       </div>
     );
   }
@@ -168,9 +164,9 @@ export function GameClient({ gameId }: { gameId: string }) {
     return (
       <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
         <Logo size={56} withText={false} />
-        <p className="text-ink-soft">كل شيء جاهز — ابدأ المباراة متى شئت.</p>
+        <p className="text-ink-soft">{t("game.readyStart")}</p>
         <button className="btn-primary" disabled={busy} onClick={() => actions.start()}>
-          <Play size={18} /> ابدأ المباراة
+          <Play size={18} /> {t("game.start")}
         </button>
       </div>
     );
@@ -180,16 +176,17 @@ export function GameClient({ gameId }: { gameId: string }) {
     q?.type === "TRUE_FALSE" ? q.ownerTeam : q?.type === "ENUMERATE" ? q.enumActiveTeam : null;
   const finished = state.status === "FINISHED";
   const noMore = !q && !finished;
+  const showTimer = !!q && !finished && state.status === "ACTIVE" && !resultPhase;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-28 pt-4">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <Link href="/" className="grid size-9 place-items-center rounded-xl border border-line bg-surface text-ink-soft hover:text-ink" aria-label="الرئيسية">
-          <ChevronRight size={18} />
+        <Link href="/" className="grid size-9 place-items-center rounded-xl border border-line bg-surface text-ink-soft hover:text-ink" aria-label={t("common.home")}>
+          <ChevronLeft size={18} className="rtl:rotate-180" />
         </Link>
         <Logo size={32} withText={false} />
-        <span className="chip text-xs">{statusLabel[state.status]}</span>
+        <LangToggle />
       </div>
 
       <Scoreboard state={state} activeTeam={resultPhase ? q?.answeredByTeam ?? null : activeTeam} />
@@ -197,7 +194,7 @@ export function GameClient({ gameId }: { gameId: string }) {
       {/* Progress — or the sudden-death banner during a tie-breaker */}
       {!finished && state.tiebreaker ? (
         <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-ink px-4 py-2.5 text-center text-sm font-semibold text-white">
-          <Swords size={16} /> جولة الحسم — تعادل! الفائز بهذا السؤال يكسب المباراة
+          <Swords size={16} /> {t("game.tiebreakBanner")}
         </div>
       ) : !finished ? (
         <div className="mt-3 flex items-center gap-3 text-xs text-ink-muted">
@@ -211,6 +208,14 @@ export function GameClient({ gameId }: { gameId: string }) {
         </div>
       ) : null}
 
+      {showTimer && (
+        <div className="mt-3">
+          {/* Reset the timer every turn — a new question, or (in enumeration) the
+              turn passing to the other team. */}
+          <RefTimer resetKey={`${q!.gameQuestionId}:${q!.enumActiveTeam ?? ""}`} />
+        </div>
+      )}
+
       {error && <div className="mt-3 rounded-xl border border-bad-500/30 bg-bad-50 p-3 text-sm font-medium text-bad-600">{error}</div>}
 
       {/* Main content */}
@@ -221,15 +226,15 @@ export function GameClient({ gameId }: { gameId: string }) {
           ) : state.status === "PAUSED" ? (
             <motion.div key="paused" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card flex flex-col items-center gap-4 p-10 text-center">
               <Pause size={40} className="text-ink" />
-              <p className="text-lg font-semibold text-ink">المباراة متوقفة مؤقتاً</p>
-              <button className="btn-primary" disabled={busy} onClick={() => actions.resume()}><Play size={18} /> استئناف</button>
+              <p className="text-lg font-semibold text-ink">{t("game.paused")}</p>
+              <button className="btn-primary" disabled={busy} onClick={() => actions.resume()}><Play size={18} /> {t("game.resume")}</button>
             </motion.div>
           ) : resultPhase && q ? (
             <ResultTransition key={`result-${q.gameQuestionId}`} q={q} state={state} last={isLastResult && !willTiebreak} tiebreakNext={willTiebreak} />
           ) : noMore ? (
             <motion.div key="nomore" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card flex flex-col items-center gap-4 p-10 text-center">
-              <p className="text-lg font-semibold text-ink">انتهت أسئلة المباراة</p>
-              <button className="btn-primary" disabled={busy} onClick={() => actions.finish()}>عرض النتيجة النهائية</button>
+              <p className="text-lg font-semibold text-ink">{t("game.noMore")}</p>
+              <button className="btn-primary" disabled={busy} onClick={() => actions.finish()}>{t("game.showFinal")}</button>
             </motion.div>
           ) : q ? (
             <div key={q.gameQuestionId}>
@@ -247,19 +252,19 @@ export function GameClient({ gameId }: { gameId: string }) {
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/92 backdrop-blur" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
           <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 py-3">
             <button className="btn-soft flex-1 !px-3" disabled={busy || !state.canUndo} onClick={() => actions.undo()}>
-              <Undo2 size={18} /> تراجع
+              <Undo2 size={18} /> {t("game.undo")}
             </button>
             {!resultPhase && (
               <button className="btn-soft flex-1 !px-3" disabled={busy} onClick={() => actions.skip()}>
-                <SkipForward size={18} /> تخطّي
+                <SkipForward size={18} /> {t("game.skip")}
               </button>
             )}
             {state.status === "ACTIVE" ? (
-              <button className="btn-soft !px-3" disabled={busy} onClick={() => actions.pause()} aria-label="إيقاف مؤقت">
+              <button className="btn-soft !px-3" disabled={busy} onClick={() => actions.pause()} aria-label={t("game.paused")}>
                 <Pause size={18} />
               </button>
             ) : (
-              <button className="btn-soft !px-3" disabled={busy} onClick={() => actions.resume()} aria-label="استئناف">
+              <button className="btn-soft !px-3" disabled={busy} onClick={() => actions.resume()} aria-label={t("game.resume")}>
                 <Play size={18} />
               </button>
             )}
@@ -272,21 +277,22 @@ export function GameClient({ gameId }: { gameId: string }) {
 }
 
 function ReportButton({ onReport, busy }: { onReport: (reason: string) => Promise<void>; busy: boolean }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   return (
     <>
-      <button className="btn-soft !px-3" disabled={busy} onClick={() => setOpen(true)} aria-label="إبلاغ عن السؤال">
+      <button className="btn-soft !px-3" disabled={busy} onClick={() => setOpen(true)} aria-label={t("report.aria")}>
         <Flag size={18} />
       </button>
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4" onClick={() => setOpen(false)}>
           <div className="card-raised w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-2 text-lg font-bold text-ink">الإبلاغ عن السؤال</h3>
-            <p className="mb-3 text-sm text-ink-soft">صف المشكلة (إجابة غير دقيقة، صياغة ملتبسة…). يُحفظ البلاغ للمراجعة لاحقاً.</p>
+            <h3 className="mb-2 text-lg font-bold text-ink">{t("report.title")}</h3>
+            <p className="mb-3 text-sm text-ink-soft">{t("report.desc")}</p>
             <textarea value={reason} onChange={(e) => setReason(e.target.value)} className="input min-h-24" />
             <div className="mt-3 flex justify-end gap-2">
-              <button className="btn-soft" onClick={() => setOpen(false)}>إلغاء</button>
+              <button className="btn-soft" onClick={() => setOpen(false)}>{t("common.cancel")}</button>
               <button
                 className="btn-primary"
                 disabled={!reason.trim()}
@@ -296,7 +302,7 @@ function ReportButton({ onReport, busy }: { onReport: (reason: string) => Promis
                   setOpen(false);
                 }}
               >
-                إرسال البلاغ
+                {t("report.send")}
               </button>
             </div>
           </div>

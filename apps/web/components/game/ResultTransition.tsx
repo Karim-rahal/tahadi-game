@@ -4,6 +4,9 @@ import { motion } from "framer-motion";
 import clsx from "clsx";
 import { ChevronLeft, Loader2, Minus, SkipForward, Swords, Trophy } from "lucide-react";
 import type { GameState, JudgeQuestionDto, TeamSide } from "@/lib/types";
+import { useLang } from "@/lib/i18n";
+
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 interface Outcome {
   tone: "A" | "B" | "neutral";
@@ -16,42 +19,38 @@ function teamName(state: GameState, side: TeamSide) {
   return side === "A" ? state.teams.A.name : state.teams.B.name;
 }
 
-function enumReasonText(q: JudgeQuestionDto, state: GameState): string | null {
-  const r = q.enumResolutionReason;
-  if (!r) return null;
-  switch (r) {
+function enumReasonText(q: JudgeQuestionDto, t: TFn): string | null {
+  switch (q.enumResolutionReason) {
     case "THREE_STRIKES_A":
-      return `بلغ ${teamName(state, "A")} ثلاثة أخطاء`;
     case "THREE_STRIKES_B":
-      return `بلغ ${teamName(state, "B")} ثلاثة أخطاء`;
+      return t("res.reason.threeStrikes");
     case "FEWER_STRIKES_A":
     case "FEWER_STRIKES_B":
-      return "أخطاء أقل";
+      return t("res.reason.fewerStrikes");
     case "UNUSED_PASS_A":
     case "UNUSED_PASS_B":
-      return "لم يستخدم التمرير";
+      return t("res.reason.unusedPass");
     case "TIE":
-      return "تعادل في الأخطاء والتمرير";
+      return t("res.reason.tie");
     default:
       return null;
   }
 }
 
-function outcomeOf(q: JudgeQuestionDto, state: GameState): Outcome {
+function outcomeOf(q: JudgeQuestionDto, state: GameState, t: TFn): Outcome {
   if (q.status === "SKIPPED") {
-    return { tone: "neutral", headline: "تم تخطّي السؤال", sub: "بلا نقاط", icon: "skip" };
+    return { tone: "neutral", headline: t("res.skipped"), sub: t("res.replacement"), icon: "skip" };
   }
   const winner = q.answeredByTeam;
   if (q.type === "ENUMERATE") {
-    if (!winner) return { tone: "neutral", headline: "تعادل — لا نقطة", sub: enumReasonText(q, state), icon: "tie" };
-    return { tone: winner, headline: `نقطة إلى ${teamName(state, winner)}`, sub: enumReasonText(q, state), icon: "trophy" };
+    if (!winner) return { tone: "neutral", headline: t("res.tieNoPoint"), sub: enumReasonText(q, t), icon: "tie" };
+    return { tone: winner, headline: t("res.pointTo", { team: teamName(state, winner) }), sub: enumReasonText(q, t), icon: "trophy" };
   }
-  // Fastest / Who am I / True-false.
   if (winner && q.pointsAwarded > 0) {
-    const sub = q.type === "TRUE_FALSE" ? "إجابة صحيحة" : null;
-    return { tone: winner, headline: `نقطة إلى ${teamName(state, winner)}`, sub, icon: "trophy" };
+    const sub = q.type === "TRUE_FALSE" ? t("res.correct") : null;
+    return { tone: winner, headline: t("res.pointTo", { team: teamName(state, winner) }), sub, icon: "trophy" };
   }
-  return { tone: "neutral", headline: "بلا نقطة", sub: q.type === "TRUE_FALSE" ? "إجابة غير صحيحة" : null, icon: "tie" };
+  return { tone: "neutral", headline: t("res.noPoint"), sub: q.type === "TRUE_FALSE" ? t("res.wrong") : null, icon: "tie" };
 }
 
 export function ResultTransition({
@@ -65,7 +64,8 @@ export function ResultTransition({
   last: boolean;
   tiebreakNext?: boolean;
 }) {
-  const o = outcomeOf(q, state);
+  const { t } = useLang();
+  const o = outcomeOf(q, state, t);
   const Icon = o.icon === "trophy" ? Trophy : o.icon === "skip" ? SkipForward : Minus;
 
   return (
@@ -109,12 +109,12 @@ export function ResultTransition({
 
       <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted">
         {tiebreakNext ? (
-          <><Swords size={14} /> تعادل — جولة حسم قادمة</>
+          <><Swords size={14} /> {t("res.tieNext")}</>
         ) : last ? (
-          <>عرض النتيجة النهائية <ChevronLeft size={14} /></>
+          <>{t("res.toFinal")} <ChevronLeft size={14} className="rtl:rotate-180" /></>
         ) : (
           <>
-            <Loader2 size={14} className="animate-spin" /> الانتقال إلى السؤال التالي
+            <Loader2 size={14} className="animate-spin" /> {t("res.toNext")}
           </>
         )}
       </div>

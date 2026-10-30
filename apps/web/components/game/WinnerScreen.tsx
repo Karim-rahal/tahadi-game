@@ -5,8 +5,10 @@ import Link from "next/link";
 import { Trophy, RotateCcw, Home, Handshake } from "lucide-react";
 import clsx from "clsx";
 import type { GameState, TeamSide } from "@/lib/types";
+import { useLang } from "@/lib/i18n";
 
 export function WinnerScreen({ state }: { state: GameState }) {
+  const { t } = useLang();
   const { winner, isTie, teams } = state;
   const winnerName = winner ? (winner === "A" ? teams.A.name : teams.B.name) : null;
   const col = (side: TeamSide) => (side === "A" ? "text-teamA-700" : "text-teamB-700");
@@ -26,10 +28,10 @@ export function WinnerScreen({ state }: { state: GameState }) {
       </motion.div>
 
       {isTie ? (
-        <h1 className="font-display text-4xl font-bold text-ink">تعادل!</h1>
+        <h1 className="font-display text-4xl font-bold text-ink">{t("win.tie")}</h1>
       ) : (
         <div>
-          <div className="text-ink-soft">الفريق الفائز</div>
+          <div className="text-ink-soft">{t("win.winner")}</div>
           <motion.h1
             initial={{ y: 12, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -61,10 +63,10 @@ export function WinnerScreen({ state }: { state: GameState }) {
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Link href="/setup" className="btn-primary">
-          <RotateCcw size={18} /> مباراة جديدة
+          <RotateCcw size={18} /> {t("win.newMatch")}
         </Link>
         <Link href="/" className="btn-soft">
-          <Home size={18} /> الرئيسية
+          <Home size={18} /> {t("common.home")}
         </Link>
       </div>
     </div>

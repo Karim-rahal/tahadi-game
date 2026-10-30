@@ -7,11 +7,12 @@ import { useState } from "react";
 import { ENUM_PASSES_PER_TEAM, ENUM_STRIKES_PER_TEAM } from "@darundi/shared";
 import type { ModeProps } from "./types";
 import type { TeamSide } from "@/lib/types";
+import { useLang } from "@/lib/i18n";
 import { QuestionMeta, QuestionText, ReviewFlags } from "./parts";
 
 function StrikeDots({ used, max }: { used: number; max: number }) {
   return (
-    <span className="inline-flex gap-1" aria-label={`${used} من ${max} أخطاء`}>
+    <span className="inline-flex gap-1">
       {Array.from({ length: max }).map((_, i) => (
         <span key={i} className={clsx("size-3 rounded-full", i < used ? "bg-bad-500" : "bg-line")} />
       ))}
@@ -20,6 +21,7 @@ function StrikeDots({ used, max }: { used: number; max: number }) {
 }
 
 export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
+  const { t } = useLang();
   const active: TeamSide = q.enumActiveTeam ?? state.startingTeam;
   const activeName = active === "A" ? state.teams.A.name : state.teams.B.name;
   const st = q.enumState ?? { A: { strikes: 0, passesUsed: 0 }, B: { strikes: 0, passesUsed: 0 } };
@@ -37,8 +39,8 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
       <div className="card-raised p-5">
         <QuestionText>{q.questionText}</QuestionText>
         <div className="mt-3 flex flex-wrap gap-4 text-sm text-ink-soft">
-          <span>المتبقّي في القائمة: <b className="tnum text-ink">{remaining}</b></span>
-          {q.minimumRequired != null && <span>الحد الأدنى: <b className="tnum text-ink">{q.minimumRequired}</b></span>}
+          <span>{t("en.remaining")}: <b className="tnum text-ink">{remaining}</b></span>
+          {q.minimumRequired != null && <span>{t("en.minimum")}: <b className="tnum text-ink">{q.minimumRequired}</b></span>}
         </div>
       </div>
 
@@ -62,13 +64,13 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
                 {side === "A" ? state.teams.A.name : state.teams.B.name}
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-ink-soft">
-                <span>الأخطاء</span>
+                <span>{t("en.strikes")}</span>
                 <StrikeDots used={st[side].strikes} max={maxStrikes} />
               </div>
               <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-ink-soft">التمرير</span>
+                <span className="text-ink-soft">{t("en.pass")}</span>
                 <span className={clsx("rounded-full px-2 py-0.5 font-semibold", used ? "bg-line text-ink-muted line-through" : "bg-good-50 text-good-600")}>
-                  {used ? "استُخدم" : "متاح"}
+                  {used ? t("en.passUsed") : t("en.passAvail")}
                 </span>
               </div>
             </div>
@@ -82,7 +84,7 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
           active === "A" ? "border-teamA-500/40 bg-teamA-50" : "border-teamB-500/40 bg-teamB-50",
         )}
       >
-        <span className="text-sm text-ink-soft">دور الإجابة الآن: </span>
+        <span className="text-sm text-ink-soft">{t("en.turnNow")} </span>
         <span className={clsx("font-display text-lg font-bold", teamText(active))}>{activeName}</span>
       </div>
 
@@ -91,15 +93,15 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
       {/* Judge-private checklist */}
       <div className="card p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-semibold text-ink">قائمة الإجابات المقبولة (للحكَم)</span>
+          <span className="text-sm font-semibold text-ink">{t("en.checklist")}</span>
           <button className="chip cursor-pointer" onClick={() => setHide((h) => !h)}>
-            {hide ? <Eye size={14} /> : <EyeOff size={14} />} {hide ? "إظهار" : "إخفاء"}
+            {hide ? <Eye size={14} /> : <EyeOff size={14} />} {hide ? t("en.show") : t("en.hide")}
           </button>
         </div>
         {hide ? (
-          <p className="py-6 text-center text-sm text-ink-muted">القائمة مخفية.</p>
+          <p className="py-6 text-center text-sm text-ink-muted">{t("en.hidden")}</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" dir="rtl">
             {q.acceptedAnswers.map((a) => (
               <button
                 key={a.id}
@@ -124,7 +126,7 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
           <input
             value={manual}
             onChange={(e) => setManual(e.target.value)}
-            placeholder="قبول يدوي لإجابة خارج القائمة…"
+            placeholder={t("en.manualPlaceholder")}
             className="input !py-2 !text-base"
           />
           <button
@@ -135,24 +137,22 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
               setManual("");
             }}
           >
-            <Plus size={16} /> قبول
+            <Plus size={16} /> {t("en.accept")}
           </button>
         </div>
       </div>
 
-      {/* Round controls for the active team — the round ends automatically on
-          the 3rd strike or when every accepted answer is used. */}
+      {/* Round controls for the active team — ends automatically at 3 strikes
+          or when every accepted answer is used. */}
       <div className="grid grid-cols-2 gap-3">
         <button className="btn-bad" disabled={busy || st[active].strikes >= maxStrikes} onClick={() => actions.strike(active)}>
-          <Ban size={18} /> خطأ (ضربة)
+          <Ban size={18} /> {t("en.strikeBtn")}
         </button>
         <button className="btn-soft" disabled={busy || st[active].passesUsed >= maxPasses} onClick={() => actions.pass(active)}>
-          <Forward size={18} /> تمرير
+          <Forward size={18} /> {t("en.passBtn")}
         </button>
       </div>
-      <p className="text-center text-xs text-ink-muted">
-        تنتهي الجولة تلقائياً عند بلوغ ٣ أخطاء أو انتهاء كل الإجابات — ثم ينتقل للسؤال التالي.
-      </p>
+      <p className="text-center text-xs text-ink-muted">{t("en.note")}</p>
     </motion.div>
   );
 }
