@@ -83,7 +83,7 @@ export default function QuestionsPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
-    <main className="mx-auto max-w-2xl px-5 py-6">
+    <main className="pt-safe pb-page mx-auto max-w-2xl px-5">
       <div className="mb-6 flex items-center justify-between">
         <Link href="/" className="grid size-10 place-items-center rounded-xl border border-line bg-surface text-ink-soft hover:text-ink" aria-label={t("common.back")}>
           <ChevronLeft size={20} className="rtl:rotate-180" />

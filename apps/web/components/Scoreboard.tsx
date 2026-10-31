@@ -21,13 +21,13 @@ function TeamSide_({
   return (
     <div
       className={clsx(
-        "relative flex-1 px-3 py-3 text-center transition-colors",
+        "relative min-w-0 flex-1 px-3 py-3 text-center transition-colors",
         active ? (isA ? "bg-teamA-500 text-white" : "bg-teamB-500 text-white") : isA ? "bg-teamA-50" : "bg-teamB-50",
       )}
     >
       <div
         className={clsx(
-          "truncate text-sm font-semibold",
+          "line-clamp-2 break-words text-sm font-semibold leading-tight",
           active ? "text-white/90" : isA ? "text-teamA-700" : "text-teamB-700",
         )}
       >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
@@ -34,7 +34,7 @@ function Choice({
       onClick={onClick}
       aria-pressed={active}
       className={clsx(
-        "flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition",
+        "flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-center text-sm font-semibold leading-tight transition",
         !active && "border-line bg-surface text-ink-soft hover:border-ink/20",
         active && tone === "neutral" && "border-ink bg-ink text-white",
         active && tone === "A" && "border-teamA-500 bg-teamA-50 text-teamA-700",
@@ -60,6 +60,10 @@ export default function SetupPage() {
   const [pool, setPool] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Synchronous single-flight guard: `submitting` state is stale within a
+  // double-tap's first render, so a ref stops a second /games POST (which would
+  // create a duplicate match) before React disables the button.
+  const startingRef = useRef(false);
 
   useEffect(() => {
     api<CategoryDto[]>("/categories")
@@ -107,6 +111,7 @@ export default function SetupPage() {
   const clamp = (v: number) => Math.max(1, pool ? Math.min(pool, v) : v);
 
   async function start(quick: boolean) {
+    if (startingRef.current) return;
     setError(null);
     const useCatIds = quick ? categories.map((c) => c.id) : catIds;
     const useTypes = quick ? [...QUESTION_TYPES] : types;
@@ -115,6 +120,7 @@ export default function SetupPage() {
     const total = quick ? Math.min(DEFAULT_COUNT, max || DEFAULT_COUNT) : n;
     if (!quick && countError) return setError(countError);
 
+    startingRef.current = true;
     setSubmitting(true);
     try {
       const res = await api<CreateGameResult>("/games", {
@@ -137,11 +143,12 @@ export default function SetupPage() {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t("setup.errCreate"));
       setSubmitting(false);
+      startingRef.current = false; // allow a retry after a failure
     }
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-5 py-6">
+    <main className="pt-safe pb-bar mx-auto max-w-2xl px-5">
       <div className="mb-6 flex items-center justify-between">
         <Link href="/" className="grid size-10 place-items-center rounded-xl border border-line bg-surface text-ink-soft hover:text-ink" aria-label={t("common.back")}>
           <ChevronLeft size={20} className="rtl:rotate-180" />
@@ -200,8 +207,8 @@ export default function SetupPage() {
             <div className="grid grid-cols-2 gap-2">
               {categories.map((c) => (
                 <Choice key={c.id} active={catIds.includes(c.id)} onClick={() => toggle(catIds, c.id, setCatIds)}>
-                  <span className="truncate" dir="rtl">{c.nameAr}</span>
-                  <span className="text-xs opacity-60">({c.questionCount})</span>
+                  <span className="min-w-0 break-words" dir="rtl">{c.nameAr}</span>
+                  <span className="shrink-0 text-xs opacity-60">({c.questionCount})</span>
                 </Choice>
               ))}
             </div>
@@ -269,8 +276,7 @@ export default function SetupPage() {
 
       <Disclaimer className="mt-6" />
 
-      <div className="h-24" />
-      <div className="fixed inset-x-0 bottom-0 border-t border-line bg-surface/90 backdrop-blur" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <div className="pb-inset fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-5 py-3">
           <Link href="/" className="btn-soft flex-1">{t("common.cancel")}</Link>
           <button className="btn-primary flex-[1.7]" disabled={submitting || loadingCats || !!countError} onClick={() => start(false)}>

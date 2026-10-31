@@ -82,9 +82,9 @@ export function TeamPickButtons({
           key={side}
           disabled={disabled}
           onClick={() => onPick(side)}
-          className={clsx("min-h-[64px] flex-col text-lg", side === "A" ? "btn-teamA" : "btn-teamB")}
+          className={clsx("min-h-[64px] flex-col py-2 text-lg", side === "A" ? "btn-teamA" : "btn-teamB")}
         >
-          <span className="truncate px-2">{side === "A" ? teamAName : teamBName}</span>
+          <span className="line-clamp-2 break-words px-2 leading-tight">{side === "A" ? teamAName : teamBName}</span>
           <span className="text-xs font-medium opacity-85">{t("q.answeredCorrectly")}</span>
         </button>
       ))}

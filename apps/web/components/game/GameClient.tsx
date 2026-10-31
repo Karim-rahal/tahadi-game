@@ -180,7 +180,7 @@ export function GameClient({ gameId }: { gameId: string }) {
   const showTimer = !!q && !finished && state.status === "ACTIVE" && !resultPhase;
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-28 pt-4">
+    <div className="pt-safe pb-bar mx-auto w-full max-w-2xl px-4">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <Link href="/" className="grid size-9 place-items-center rounded-xl border border-line bg-surface text-ink-soft hover:text-ink" aria-label={t("common.home")}>
@@ -252,7 +252,7 @@ export function GameClient({ gameId }: { gameId: string }) {
 
       {/* Control bar — no Next button; advancement is automatic. */}
       {!finished && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/92 backdrop-blur" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="pb-inset fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/92 backdrop-blur">
           <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 py-3">
             <button className="btn-soft flex-1 !px-3" disabled={busy || !state.canUndo} onClick={() => actions.undo()}>
               <Undo2 size={18} /> {t("game.undo")}

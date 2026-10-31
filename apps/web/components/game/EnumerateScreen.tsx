@@ -69,7 +69,7 @@ export function EnumerateScreen({ q, state, actions, busy }: ModeProps) {
                   : "border-line bg-surface",
               )}
             >
-              <div className={clsx("truncate font-bold", teamText(side))}>
+              <div className={clsx("break-words font-bold leading-tight", teamText(side))}>
                 {side === "A" ? state.teams.A.name : state.teams.B.name}
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-ink-soft">

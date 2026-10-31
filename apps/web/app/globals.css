@@ -25,10 +25,37 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   min-height: 100dvh;
+  /* Safety net against accidental horizontal scroll from an overflowing child.
+     Root causes are fixed at the component (min-w-0 / wrapping); this only
+     guards against regressions. */
+  overflow-x: hidden;
 }
 
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+@layer utilities {
+  /* ── Mobile safe-area spacing (viewport-fit=cover, notch / Dynamic Island) ──
+     One source of truth so every screen clears the status bar at the top and
+     the home indicator / browser chrome at the bottom. */
+  .pt-safe {
+    padding-top: calc(env(safe-area-inset-top) + 1.25rem);
+  }
+  /* Bottom padding for a page WITHOUT a fixed action bar. */
+  .pb-page {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+  }
+  /* Bottom padding for a scroll area that sits behind a fixed action bar — the
+     bar is ~72px tall (py-3 + a 48px control), plus breathing room and the
+     device inset, so the last content is never hidden under it. */
+  .pb-bar {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 6.75rem);
+  }
+  /* The fixed bar's own bottom inset so its controls clear the home indicator. */
+  .pb-inset {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 @layer components {

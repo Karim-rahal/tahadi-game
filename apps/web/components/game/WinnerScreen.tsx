@@ -55,7 +55,7 @@ export function WinnerScreen({ state }: { state: GameState }) {
                 : "border-line bg-surface",
             )}
           >
-            <div className={clsx("truncate font-bold", col(side))}>{side === "A" ? teams.A.name : teams.B.name}</div>
+            <div className={clsx("break-words font-bold leading-tight", col(side))}>{side === "A" ? teams.A.name : teams.B.name}</div>
             <div className="tnum mt-1 font-display text-4xl font-bold text-ink">{side === "A" ? teams.A.score : teams.B.score}</div>
           </div>
         ))}

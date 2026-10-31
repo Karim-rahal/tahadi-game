@@ -12,7 +12,7 @@ import { useLang } from "@/lib/i18n";
 export default function HomePage() {
   const { t } = useLang();
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col px-5 py-7">
+    <main className="pt-safe pb-page mx-auto flex min-h-dvh max-w-2xl flex-col px-5">
       <header className="flex items-center justify-between">
         <Logo size={44} />
         <LangToggle />
